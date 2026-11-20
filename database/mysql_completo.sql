@@ -11,6 +11,8 @@ CREATE DATABASE IF NOT EXISTS ruta_clara
 USE ruta_clara;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS campanas_guardadas;
+DROP TABLE IF EXISTS notas_oportunidad;
 DROP TABLE IF EXISTS eventos_comerciales;
 DROP TABLE IF EXISTS historial_etapas;
 DROP TABLE IF EXISTS oportunidades;
@@ -43,10 +45,14 @@ CREATE TABLE motivos_perdida (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Entidad de clientes (un cliente puede tener múltiples oportunidades de viaje)
+-- Nota: teléfono y correo son opcionales para gestión del asesor y NUNCA se envían a la IA.
 CREATE TABLE clientes (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(140) NOT NULL,
-  es_ficticio TINYINT(1) NOT NULL DEFAULT 1,
+  telefono VARCHAR(40) NULL,
+  correo VARCHAR(140) NULL,
+  preferencia_contacto VARCHAR(40) NOT NULL DEFAULT 'WhatsApp',
+  es_ficticio TINYINT NOT NULL DEFAULT 1,
   creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_clientes_nombre CHECK (CHAR_LENGTH(TRIM(nombre)) >= 2),
   CONSTRAINT chk_clientes_ficticio CHECK (es_ficticio IN (0, 1))
@@ -96,8 +102,8 @@ CREATE TABLE historial_etapas (
   oportunidad_id INT UNSIGNED NOT NULL,
   etapa_id INT UNSIGNED NOT NULL,
   fecha DATETIME NOT NULL,
-  CONSTRAINT fk_historial_oportunidad FOREIGN KEY (oportunidad_id) REFERENCES oportunidades(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_historial_etapa FOREIGN KEY (etapa_id) REFERENCES etapas(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_historial_oportunidad FOREIGN KEY (oportunidad_id) REFERENCES oportunidades(id) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT fk_historial_etapa FOREIGN KEY (etapa_id) REFERENCES etapas(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   UNIQUE KEY uq_historial_oportunidad_etapa (oportunidad_id, etapa_id),
   INDEX idx_historial_etapa_oportunidad (etapa_id, oportunidad_id),
   INDEX idx_historial_oportunidad_fecha (oportunidad_id, fecha)
@@ -121,6 +127,33 @@ CREATE TABLE eventos_comerciales (
   ),
   INDEX idx_eventos_oportunidad_fecha (oportunidad_id, fecha),
   INDEX idx_eventos_tipo_motivo (tipo, motivo_perdida_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 8. Bitácora de notas del agente por oportunidad
+CREATE TABLE notas_oportunidad (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  oportunidad_id INT UNSIGNED NOT NULL,
+  autor VARCHAR(80) NOT NULL DEFAULT 'Asesor Ruta Clara',
+  texto VARCHAR(600) NOT NULL,
+  fecha DATETIME NOT NULL,
+  CONSTRAINT fk_notas_oportunidad FOREIGN KEY (oportunidad_id) REFERENCES oportunidades(id) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT chk_notas_texto CHECK (CHAR_LENGTH(TRIM(texto)) >= 2),
+  INDEX idx_notas_oportunidad_fecha (oportunidad_id, fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 9. Historial de campañas de redes sociales generadas con IA
+CREATE TABLE campanas_guardadas (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  sede_id INT UNSIGNED NOT NULL,
+  sede_nombre VARCHAR(80) NOT NULL,
+  objetivo VARCHAR(300) NOT NULL,
+  proveedor VARCHAR(40) NOT NULL DEFAULT 'DeepSeek',
+  modelo VARCHAR(80) NOT NULL,
+  estado VARCHAR(40) NOT NULL DEFAULT 'Pendiente de aprobación',
+  borradores_json JSON NOT NULL,
+  creado_en DATETIME NOT NULL,
+  CONSTRAINT fk_campanas_sede FOREIGN KEY (sede_id) REFERENCES sedes(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  INDEX idx_campanas_fecha (creado_en)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Catálogos base obligatorios
@@ -151,39 +184,39 @@ INSERT INTO motivos_perdida (id, nombre) VALUES
 -- SEMILLA DE 32 CLIENTES Y 40 OPORTUNIDADES [4, 4, 3, 18, 2, 2, 3, 2, 2]
 -- =============================================================================
 
-INSERT INTO clientes (id, nombre, es_ficticio, creado_en) VALUES
-  (1, 'Valeria Mora Quirós (Ficticio)', 1, '2026-08-17 12:00:00'),
-  (2, 'Sebastián Solís Araya (Ficticio)', 1, '2026-08-18 11:00:00'),
-  (3, 'Camila Vargas Brenes (Ficticio)', 1, '2026-08-19 10:00:00'),
-  (4, 'Mateo Jiménez Cordero (Ficticio)', 1, '2026-08-20 09:00:00'),
-  (5, 'Lucía Rojas Alvarado (Ficticio)', 1, '2026-08-21 08:00:00'),
-  (6, 'Daniel Castro Monge (Ficticio)', 1, '2026-08-22 07:00:00'),
-  (7, 'Sofía Herrera Chacón (Ficticio)', 1, '2026-08-23 12:00:00'),
-  (8, 'Andrés Navarro Salas (Ficticio)', 1, '2026-08-24 11:00:00'),
-  (9, 'Mariana Madrigal Soto (Ficticio)', 1, '2026-08-25 10:00:00'),
-  (10, 'Gabriel Quesada Méndez (Ficticio)', 1, '2026-08-26 09:00:00'),
-  (11, 'Elena Calderón Vega (Ficticio)', 1, '2026-08-27 08:00:00'),
-  (12, 'Diego Pacheco Ureña (Ficticio)', 1, '2026-08-28 07:00:00'),
-  (13, 'Adriana Villalobos Fonseca (Ficticio)', 1, '2026-08-29 12:00:00'),
-  (14, 'Javier Elizondo Campos (Ficticio)', 1, '2026-08-30 11:00:00'),
-  (15, 'Natalia Bolaños Guzmán (Ficticio)', 1, '2026-08-31 10:00:00'),
-  (16, 'Fernando Murillo Valverde (Ficticio)', 1, '2026-09-01 09:00:00'),
-  (17, 'Carolina Arce Picado (Ficticio)', 1, '2026-09-02 08:00:00'),
-  (18, 'Ricardo Zúñiga Paniagua (Ficticio)', 1, '2026-09-03 07:00:00'),
-  (19, 'Paula Coto Chavarría (Ficticio)', 1, '2026-09-04 12:00:00'),
-  (20, 'Esteban Granados Sancho (Ficticio)', 1, '2026-09-05 11:00:00'),
-  (21, 'Alejandra Alfaro Porras (Ficticio)', 1, '2026-09-06 10:00:00'),
-  (22, 'Mauricio Bermúdez Núñez (Ficticio)', 1, '2026-09-07 09:00:00'),
-  (23, 'Isabel Chaves Mena (Ficticio)', 1, '2026-09-08 08:00:00'),
-  (24, 'Roberto Corrales Zamora (Ficticio)', 1, '2026-09-09 07:00:00'),
-  (25, 'Claudia Espinoza Fallas (Ficticio)', 1, '2026-09-10 12:00:00'),
-  (26, 'Jorge Esquivel Meza (Ficticio)', 1, '2026-09-11 11:00:00'),
-  (27, 'Patricia Fernández Leiva (Ficticio)', 1, '2026-09-12 10:00:00'),
-  (28, 'Carlos Gamboa Rivera (Ficticio)', 1, '2026-09-13 09:00:00'),
-  (29, 'Mónica Gómez Hidalgo (Ficticio)', 1, '2026-09-14 08:00:00'),
-  (30, 'Héctor Hernández Barquero (Ficticio)', 1, '2026-09-15 07:00:00'),
-  (31, 'Laura León Segura (Ficticio)', 1, '2026-09-16 12:00:00'),
-  (32, 'Óscar López Marin (Ficticio)', 1, '2026-09-17 11:00:00');
+INSERT INTO clientes (id, nombre, telefono, correo, preferencia_contacto, es_ficticio, creado_en) VALUES
+  (1, 'Valeria Mora Quirós (Ficticio)', '+506 8000-1001 (Ficticio)', 'viajero1@rutaclara-demo.cr', 'WhatsApp', 1, '2026-08-17 12:00:00'),
+  (2, 'Sebastián Solís Araya (Ficticio)', '+506 8000-1002 (Ficticio)', 'viajero2@rutaclara-demo.cr', 'Correo', 1, '2026-08-18 11:00:00'),
+  (3, 'Camila Vargas Brenes (Ficticio)', '+506 8000-1003 (Ficticio)', 'viajero3@rutaclara-demo.cr', 'Llamada', 1, '2026-08-19 10:00:00'),
+  (4, 'Mateo Jiménez Cordero (Ficticio)', '+506 8000-1004 (Ficticio)', 'viajero4@rutaclara-demo.cr', 'Instagram', 1, '2026-08-20 09:00:00'),
+  (5, 'Lucía Rojas Alvarado (Ficticio)', '+506 8000-1005 (Ficticio)', 'viajero5@rutaclara-demo.cr', 'WhatsApp', 1, '2026-08-21 08:00:00'),
+  (6, 'Daniel Castro Monge (Ficticio)', '+506 8000-1006 (Ficticio)', 'viajero6@rutaclara-demo.cr', 'Correo', 1, '2026-08-22 07:00:00'),
+  (7, 'Sofía Herrera Chacón (Ficticio)', '+506 8000-1007 (Ficticio)', 'viajero7@rutaclara-demo.cr', 'Llamada', 1, '2026-08-23 12:00:00'),
+  (8, 'Andrés Navarro Salas (Ficticio)', '+506 8000-1008 (Ficticio)', 'viajero8@rutaclara-demo.cr', 'Instagram', 1, '2026-08-24 11:00:00'),
+  (9, 'Mariana Madrigal Soto (Ficticio)', '+506 8000-1009 (Ficticio)', 'viajero9@rutaclara-demo.cr', 'WhatsApp', 1, '2026-08-25 10:00:00'),
+  (10, 'Gabriel Quesada Méndez (Ficticio)', '+506 8000-1010 (Ficticio)', 'viajero10@rutaclara-demo.cr', 'Correo', 1, '2026-08-26 09:00:00'),
+  (11, 'Elena Calderón Vega (Ficticio)', '+506 8000-1011 (Ficticio)', 'viajero11@rutaclara-demo.cr', 'Llamada', 1, '2026-08-27 08:00:00'),
+  (12, 'Diego Pacheco Ureña (Ficticio)', '+506 8000-1012 (Ficticio)', 'viajero12@rutaclara-demo.cr', 'Instagram', 1, '2026-08-28 07:00:00'),
+  (13, 'Adriana Villalobos Fonseca (Ficticio)', '+506 8000-1013 (Ficticio)', 'viajero13@rutaclara-demo.cr', 'WhatsApp', 1, '2026-08-29 12:00:00'),
+  (14, 'Javier Elizondo Campos (Ficticio)', '+506 8000-1014 (Ficticio)', 'viajero14@rutaclara-demo.cr', 'Correo', 1, '2026-08-30 11:00:00'),
+  (15, 'Natalia Bolaños Guzmán (Ficticio)', '+506 8000-1015 (Ficticio)', 'viajero15@rutaclara-demo.cr', 'Llamada', 1, '2026-08-31 10:00:00'),
+  (16, 'Fernando Murillo Valverde (Ficticio)', '+506 8000-1016 (Ficticio)', 'viajero16@rutaclara-demo.cr', 'Instagram', 1, '2026-09-01 09:00:00'),
+  (17, 'Carolina Arce Picado (Ficticio)', '+506 8000-1017 (Ficticio)', 'viajero17@rutaclara-demo.cr', 'WhatsApp', 1, '2026-09-02 08:00:00'),
+  (18, 'Ricardo Zúñiga Paniagua (Ficticio)', '+506 8000-1018 (Ficticio)', 'viajero18@rutaclara-demo.cr', 'Correo', 1, '2026-09-03 07:00:00'),
+  (19, 'Paula Coto Chavarría (Ficticio)', '+506 8000-1019 (Ficticio)', 'viajero19@rutaclara-demo.cr', 'Llamada', 1, '2026-09-04 12:00:00'),
+  (20, 'Esteban Granados Sancho (Ficticio)', '+506 8000-1020 (Ficticio)', 'viajero20@rutaclara-demo.cr', 'Instagram', 1, '2026-09-05 11:00:00'),
+  (21, 'Alejandra Alfaro Porras (Ficticio)', '+506 8000-1021 (Ficticio)', 'viajero21@rutaclara-demo.cr', 'WhatsApp', 1, '2026-09-06 10:00:00'),
+  (22, 'Mauricio Bermúdez Núñez (Ficticio)', '+506 8000-1022 (Ficticio)', 'viajero22@rutaclara-demo.cr', 'Correo', 1, '2026-09-07 09:00:00'),
+  (23, 'Isabel Chaves Mena (Ficticio)', '+506 8000-1023 (Ficticio)', 'viajero23@rutaclara-demo.cr', 'Llamada', 1, '2026-09-08 08:00:00'),
+  (24, 'Roberto Corrales Zamora (Ficticio)', '+506 8000-1024 (Ficticio)', 'viajero24@rutaclara-demo.cr', 'Instagram', 1, '2026-09-09 07:00:00'),
+  (25, 'Claudia Espinoza Fallas (Ficticio)', '+506 8000-1025 (Ficticio)', 'viajero25@rutaclara-demo.cr', 'WhatsApp', 1, '2026-09-10 12:00:00'),
+  (26, 'Jorge Esquivel Meza (Ficticio)', '+506 8000-1026 (Ficticio)', 'viajero26@rutaclara-demo.cr', 'Correo', 1, '2026-09-11 11:00:00'),
+  (27, 'Patricia Fernández Leiva (Ficticio)', '+506 8000-1027 (Ficticio)', 'viajero27@rutaclara-demo.cr', 'Llamada', 1, '2026-09-12 10:00:00'),
+  (28, 'Carlos Gamboa Rivera (Ficticio)', '+506 8000-1028 (Ficticio)', 'viajero28@rutaclara-demo.cr', 'Instagram', 1, '2026-09-13 09:00:00'),
+  (29, 'Mónica Gómez Hidalgo (Ficticio)', '+506 8000-1029 (Ficticio)', 'viajero29@rutaclara-demo.cr', 'WhatsApp', 1, '2026-09-14 08:00:00'),
+  (30, 'Héctor Hernández Barquero (Ficticio)', '+506 8000-1030 (Ficticio)', 'viajero30@rutaclara-demo.cr', 'Correo', 1, '2026-09-15 07:00:00'),
+  (31, 'Laura León Segura (Ficticio)', '+506 8000-1031 (Ficticio)', 'viajero31@rutaclara-demo.cr', 'Llamada', 1, '2026-09-16 12:00:00'),
+  (32, 'Óscar López Marin (Ficticio)', '+506 8000-1032 (Ficticio)', 'viajero32@rutaclara-demo.cr', 'Instagram', 1, '2026-09-17 11:00:00');
 
 INSERT INTO oportunidades (id, cliente_id, sede_id, etapa_id, destino, presupuesto_total, moneda, viajeros, fecha_salida, canal, estado_comercial, motivo_perdida_id, creado_en, ultimo_avance_en, editado_en) VALUES
   (1, 1, 1, 1, 'Cancún', 28500.00, 'MXN', 1, '2026-12-30', 'Instagram', 'abierta', NULL, '2026-11-18 11:00:00', '2026-11-18 11:00:00', '2026-11-18 11:00:00'),
@@ -406,3 +439,8 @@ INSERT INTO eventos_comerciales (id, oportunidad_id, etapa_id, tipo, motivo_perd
   (4, 13, 4, 'perdida', 1, '2026-11-14 07:00:00'),
   (5, 16, 4, 'perdida', 3, '2026-11-08 13:00:00'),
   (6, 19, 4, 'perdida', 5, '2026-11-02 10:00:00');
+
+INSERT INTO notas_oportunidad (id, oportunidad_id, autor, texto, fecha) VALUES
+  (1, 12, 'Asesor Ruta Clara', 'Solicitó opciones de hotel boutique en La Candelaria y guía gastronómico para 4 personas.', '2026-11-18 09:00:00'),
+  (2, 14, 'Asesor Ruta Clara', 'Interesados en ruta artesanal por Oaxaca y Monte Albán; prefieren vuelos con escala corta.', '2026-11-17 10:00:00'),
+  (3, 15, 'Asesor Ruta Clara', 'Revisando fechas de vacaciones laborales para confirmar propuesta hacia Madrid.', '2026-11-16 07:00:00');
