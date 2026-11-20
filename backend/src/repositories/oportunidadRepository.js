@@ -9,6 +9,9 @@ export class OportunidadRepository {
         o.id,
         o.cliente_id,
         c.nombre AS cliente_nombre,
+        c.telefono AS cliente_telefono,
+        c.correo AS cliente_correo,
+        c.preferencia_contacto AS cliente_preferencia_contacto,
         c.es_ficticio AS cliente_es_ficticio,
         o.sede_id,
         s.nombre AS sede_nombre,
@@ -270,5 +273,85 @@ export class OportunidadRepository {
       ORDER BY ev.fecha ASC, ev.id ASC`
     );
     return rows;
+  }
+
+  async listarNotasDeOportunidad(oportunidadId, conn = this.pool) {
+    try {
+      const [rows] = await conn.execute(
+        `SELECT id, oportunidad_id, autor, texto, fecha
+         FROM notas_oportunidad
+         WHERE oportunidad_id = ?
+         ORDER BY fecha DESC, id DESC`,
+        [oportunidadId]
+      );
+      return rows;
+    } catch {
+      return [];
+    }
+  }
+
+  async crearNotaOportunidad({ oportunidad_id, autor, texto, fecha }, conn = this.pool) {
+    const [result] = await conn.execute(
+      `INSERT INTO notas_oportunidad (oportunidad_id, autor, texto, fecha)
+       VALUES (?, ?, ?, ?)`,
+      [oportunidad_id, autor, texto, fecha]
+    );
+    const [rows] = await conn.execute(
+      'SELECT id, oportunidad_id, autor, texto, fecha FROM notas_oportunidad WHERE id = ?',
+      [result.insertId]
+    );
+    return rows[0] || { id: result.insertId, oportunidad_id, autor, texto, fecha };
+  }
+
+  async listarCampanasGuardadas(conn = this.pool) {
+    try {
+      const [rows] = await conn.execute(
+        `SELECT id, sede_id, sede_nombre, objetivo, proveedor, modelo, estado, borradores_json, creado_en
+         FROM campanas_guardadas
+         ORDER BY creado_en DESC, id DESC
+         LIMIT 20`
+      );
+      return rows.map((r) => ({
+        ...r,
+        borradores:
+          typeof r.borradores_json === 'string'
+            ? JSON.parse(r.borradores_json)
+            : r.borradores_json || []
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async guardarCampanaGenerada(
+    { sede_id, sede_nombre, objetivo, proveedor, modelo, estado, borradores, creado_en },
+    conn = this.pool
+  ) {
+    try {
+      const [result] = await conn.execute(
+        `INSERT INTO campanas_guardadas (sede_id, sede_nombre, objetivo, proveedor, modelo, estado, borradores_json, creado_en)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          sede_id,
+          sede_nombre,
+          objetivo,
+          proveedor || 'DeepSeek',
+          modelo || 'deepseek-chat',
+          estado || 'Pendiente de aprobación',
+          JSON.stringify(borradores || []),
+          creado_en
+        ]
+      );
+      return result.insertId;
+    } catch {
+      return null;
+    }
+  }
+
+  async actualizarEstadoCampana(campanaId, nuevoEstado, conn = this.pool) {
+    await conn.execute('UPDATE campanas_guardadas SET estado = ? WHERE id = ?', [
+      nuevoEstado,
+      campanaId
+    ]);
   }
 }
