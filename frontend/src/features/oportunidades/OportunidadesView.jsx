@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Briefcase,
   Search,
@@ -10,7 +10,10 @@ import {
   ArrowRight,
   Plane,
   Users,
-  Calendar
+  Calendar,
+  Download,
+  ShieldAlert,
+  ArrowUpDown
 } from 'lucide-react';
 import {
   BrandRouteDivider,
@@ -37,20 +40,30 @@ export function OportunidadesView({
   clientes,
   cargando,
   clientePreseleccionado,
+  etapaPreseleccionadaId,
   onLimpiarPreseleccionCliente,
+  onLimpiarPreseleccionEtapa,
   onCrearOportunidad,
+  onAvanzarEtapa,
   onAbrirOportunidad
 }) {
   const [vista, setVista] = useState('kanban'); // 'kanban' | 'tabla'
   const [busqueda, setBusqueda] = useState('');
   const [filtroSede, setFiltroSede] = useState('');
   const [filtroCanal, setFiltroCanal] = useState('');
-  const [filtroEtapa, setFiltroEtapa] = useState('');
+  const [filtroEtapa, setFiltroEtapa] = useState(
+    etapaPreseleccionadaId ? String(etapaPreseleccionadaId) : ''
+  );
   const [filtroEstado, setFiltroEstado] = useState('');
 
-  // Estado del formulario de creación (se abre automáticamente si viene un cliente preseleccionado)
+  // Ordenamiento en vista de tabla
+  const [ordenTabla, setOrdenTabla] = useState({ campo: 'id', direccion: 'asc' });
+
+  // Modal de avance rápido desde la tarjeta Kanban
+  const [opParaAvanceRapido, setOpParaAvanceRapido] = useState(null);
+
   const [mostrarFormCrear, setMostrarFormCrear] = useState(Boolean(clientePreseleccionado));
-  const [modoCliente, setModoCliente] = useState('existente'); // 'existente' | 'nuevo'
+  const [modoCliente, setModoCliente] = useState('existente');
   const [formCrear, setFormCrear] = useState({
     cliente_id: clientePreseleccionado ? String(clientePreseleccionado.id) : '',
     cliente_nombre: '',
@@ -63,8 +76,7 @@ export function OportunidadesView({
     fecha_salida: '2027-02-15'
   });
 
-  // Sincronizar cuando se solicita crear oportunidad desde la pantalla de Clientes
-  React.useEffect(() => {
+  useEffect(() => {
     if (clientePreseleccionado) {
       setMostrarFormCrear(true);
       setModoCliente('existente');
@@ -75,10 +87,16 @@ export function OportunidadesView({
     }
   }, [clientePreseleccionado]);
 
+  useEffect(() => {
+    if (etapaPreseleccionadaId) {
+      setFiltroEtapa(String(etapaPreseleccionadaId));
+    }
+  }, [etapaPreseleccionadaId]);
+
   const {
-    cargando: creando,
-    error: errorCrear,
-    exito: exitoCrear,
+    cargando: procesando,
+    error: errorAccion,
+    exito: exitoAccion,
     limpiarMensajes,
     ejecutar
   } = useAsyncAction();
@@ -87,7 +105,7 @@ export function OportunidadesView({
   const etapas = catalogos?.etapas?.length ? catalogos.etapas : ETAPAS_LISTA;
 
   const oportunidadesFiltradas = useMemo(() => {
-    return (oportunidades || []).filter((op) => {
+    const base = (oportunidades || []).filter((op) => {
       if (filtroSede && Number(op.sede_id) !== Number(filtroSede)) return false;
       if (filtroCanal && op.canal !== filtroCanal) return false;
       if (filtroEtapa && Number(op.etapa_id) !== Number(filtroEtapa)) return false;
@@ -102,7 +120,22 @@ export function OportunidadesView({
 
       return true;
     });
-  }, [oportunidades, filtroSede, filtroCanal, filtroEtapa, filtroEstado, busqueda]);
+
+    if (vista !== 'tabla') return base;
+
+    const copia = [...base];
+    const factor = ordenTabla.direccion === 'asc' ? 1 : -1;
+    copia.sort((a, b) => {
+      if (ordenTabla.campo === 'id') return (Number(a.id) - Number(b.id)) * factor;
+      if (ordenTabla.campo === 'etapa_orden') return (Number(a.etapa_orden) - Number(b.etapa_orden)) * factor;
+      if (ordenTabla.campo === 'dias_sin_avance') return (Number(a.dias_sin_avance || 0) - Number(b.dias_sin_avance || 0)) * factor;
+      if (ordenTabla.campo === 'fecha_salida') return String(a.fecha_salida).localeCompare(String(b.fecha_salida)) * factor;
+      if (ordenTabla.campo === 'cliente_nombre') return String(a.cliente_nombre).localeCompare(String(b.cliente_nombre)) * factor;
+      if (ordenTabla.campo === 'destino') return String(a.destino).localeCompare(String(b.destino)) * factor;
+      return 0;
+    });
+    return copia;
+  }, [oportunidades, filtroSede, filtroCanal, filtroEtapa, filtroEstado, busqueda, vista, ordenTabla]);
 
   const hayFiltrosActivos = Boolean(
     busqueda.trim() || filtroSede || filtroCanal || filtroEtapa || filtroEstado
@@ -114,6 +147,65 @@ export function OportunidadesView({
     setFiltroCanal('');
     setFiltroEtapa('');
     setFiltroEstado('');
+    if (onLimpiarPreseleccionEtapa) onLimpiarPreseleccionEtapa();
+  };
+
+  const alternarOrdenTabla = (campo) => {
+    setOrdenTabla((prev) => ({
+      campo,
+      direccion: prev.campo === campo && prev.direccion === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const exportarVistaFiltradaCSV = () => {
+    const encabezados = [
+      'ID',
+      'Cliente',
+      'Destino',
+      'Etapa_Orden',
+      'Etapa_Nombre',
+      'Estado_Comercial',
+      'Motivo_Perdida',
+      'Sede',
+      'Canal',
+      'Presupuesto_Declarado',
+      'Moneda',
+      'Viajeros',
+      'Fecha_Salida',
+      'Dias_Sin_Avance'
+    ];
+    const escaparCSV = (val) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+    const filas = oportunidadesFiltradas.map((op) =>
+      [
+        op.id,
+        op.cliente_nombre,
+        op.destino,
+        op.etapa_orden,
+        op.etapa_nombre,
+        op.estado_comercial,
+        op.motivo_perdida_nombre || '',
+        op.sede_nombre,
+        op.canal,
+        Number(op.presupuesto_total).toFixed(2),
+        op.moneda,
+        op.viajeros,
+        op.fecha_salida,
+        op.dias_sin_avance ?? 0
+      ]
+        .map(escaparCSV)
+        .join(',')
+    );
+
+    const contenido = '\uFEFF' + [encabezados.join(','), ...filas].join('\n');
+    const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ruta-clara-oportunidades-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleCambioForm = (campo, valor) => {
@@ -142,8 +234,6 @@ export function OportunidadesView({
         }
 
         const creada = await onCrearOportunidad(payload);
-
-        // Si tuvo éxito, limpiamos solo campos de texto y cerramos preselección
         setFormCrear((prev) => ({
           ...prev,
           cliente_nombre: '',
@@ -155,7 +245,22 @@ export function OportunidadesView({
         return creada;
       }, 'Oportunidad creada en la etapa 1 ("Consulta recibida") con su registro inicial en el historial.');
     } catch {
-      // Si falla la validación (ej. presupuesto negativo o viajeros fuera de rango), el formulario conserva los datos
+      // Conserva los datos en caso de error
+    }
+  };
+
+  const handleConfirmarAvanceRapido = async () => {
+    if (!opParaAvanceRapido) return;
+    const siguienteEtapa = etapas.find(
+      (e) => Number(e.orden) === Number(opParaAvanceRapido.etapa_orden) + 1
+    );
+    try {
+      await ejecutar(async () => {
+        await onAvanzarEtapa(opParaAvanceRapido.id, siguienteEtapa?.id);
+        setOpParaAvanceRapido(null);
+      }, `Oportunidad #${opParaAvanceRapido.id} (${opParaAvanceRapido.destino}) avanzada a "${siguienteEtapa?.nombre}". Recuerde que este cambio solo actualiza el CRM.`);
+    } catch {
+      // Mantiene modal
     }
   };
 
@@ -175,7 +280,7 @@ export function OportunidadesView({
               Oportunidades de viaje (9 etapas)
             </h1>
             <p className="mt-1 text-sm text-tinta/75">
-              Consulte el tablero Kanban o la vista de tabla. Nota: los presupuestos declarados están en MXN, USD o EUR y nunca se suman entre monedas distintas ni se presentan como ingresos.
+              Consulte el tablero Kanban o la vista de tabla ordenable. Los presupuestos declarados están en MXN, USD o EUR y nunca se suman entre monedas distintas ni se presentan como ingresos.
             </p>
           </div>
 
@@ -215,6 +320,16 @@ export function OportunidadesView({
 
             <button
               type="button"
+              onClick={exportarVistaFiltradaCSV}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-tinta/20 bg-marfil px-3.5 py-2 text-xs font-semibold text-tinta hover:bg-marfil-oscuro"
+              title="Descargar las oportunidades filtradas en formato CSV / Excel"
+            >
+              <Download className="h-3.5 w-3.5 text-turquesa" aria-hidden="true" />
+              <span>Exportar CSV ({oportunidadesFiltradas.length})</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 limpiarMensajes();
                 setMostrarFormCrear((prev) => !prev);
@@ -229,25 +344,74 @@ export function OportunidadesView({
         <BrandRouteDivider className="mt-4" label="9 etapas del recorrido comercial" />
       </header>
 
-      {errorCrear ? (
+      {errorAccion ? (
         <AlertBanner
           tipo="error"
-          titulo="Error de validación al crear la oportunidad"
-          mensaje={errorCrear}
+          titulo="Error al procesar la oportunidad"
+          mensaje={errorAccion}
           onClose={limpiarMensajes}
         />
       ) : null}
 
-      {exitoCrear ? (
+      {exitoAccion ? (
         <AlertBanner
           tipo="exito"
-          titulo="Oportunidad registrada"
-          mensaje={exitoCrear}
+          titulo="Operación confirmada"
+          mensaje={exitoAccion}
           onClose={limpiarMensajes}
         />
       ) : null}
 
-      {/* Formulario para crear oportunidad (cliente existente o nuevo) */}
+      {/* Modal de confirmación de avance rápido desde Kanban */}
+      {opParaAvanceRapido ? (
+        <section
+          role="dialog"
+          aria-labelledby="titulo-avance-rapido"
+          className="rounded-2xl border-2 border-tinta bg-white p-6 shadow-md"
+        >
+          {(() => {
+            const sig = etapas.find(
+              (e) => Number(e.orden) === Number(opParaAvanceRapido.etapa_orden) + 1
+            );
+            return (
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="mt-0.5 h-6 w-6 shrink-0 text-coral" aria-hidden="true" />
+                <div className="flex-1">
+                  <h2 id="titulo-avance-rapido" className="font-editorial text-lg font-bold text-tinta">
+                    Confirmar avance rápido · Oportunidad #{opParaAvanceRapido.id} ({opParaAvanceRapido.destino} — {opParaAvanceRapido.cliente_nombre})
+                  </h2>
+                  <p className="mt-1 text-sm text-tinta/85">
+                    Pasará de la etapa <strong>{opParaAvanceRapido.etapa_orden} ({opParaAvanceRapido.etapa_nombre})</strong> a la etapa{' '}
+                    <strong>{sig?.orden} ({sig?.nombre})</strong> y se registrará la fecha UTC en el historial cronológico.
+                  </p>
+                  <div className="mt-2.5 rounded-xl border border-amber-800/30 bg-amber-50 p-3 text-xs font-medium text-amber-950">
+                    <strong>Aviso obligatorio:</strong> Cambiar una etapa solo actualiza el CRM: no confirma pagos ni reservas con proveedores.
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2.5">
+                    <button
+                      type="button"
+                      disabled={procesando}
+                      onClick={handleConfirmarAvanceRapido}
+                      className="rounded-xl bg-tinta px-4 py-2 text-xs font-semibold text-white hover:bg-tinta-suave disabled:opacity-50"
+                    >
+                      {procesando ? 'Avanzando etapa...' : `Confirmar avance a "${sig?.nombre}"`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOpParaAvanceRapido(null)}
+                      className="rounded-xl border border-tinta/20 bg-marfil px-4 py-2 text-xs font-semibold text-tinta"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </section>
+      ) : null}
+
+      {/* Formulario para crear oportunidad */}
       {mostrarFormCrear ? (
         <section
           aria-labelledby="titulo-form-nueva-oportunidad"
@@ -439,11 +603,11 @@ export function OportunidadesView({
             <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3">
               <button
                 type="submit"
-                disabled={creando}
+                disabled={procesando}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-tinta px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-tinta-suave disabled:opacity-50"
               >
                 <PlusCircle className="h-4 w-4 text-coral" aria-hidden="true" />
-                <span>{creando ? 'Registrando oportunidad...' : 'Guardar oportunidad'}</span>
+                <span>{procesando ? 'Registrando oportunidad...' : 'Guardar oportunidad'}</span>
               </button>
               <button
                 type="button"
@@ -581,7 +745,6 @@ export function OportunidadesView({
         </div>
       </section>
 
-      {/* Contenido principal: Tablero Kanban de 9 etapas o Vista de Tabla */}
       {cargando ? (
         <LoadingState mensaje="Cargando oportunidades del embudo..." />
       ) : oportunidadesFiltradas.length === 0 ? (
@@ -645,63 +808,83 @@ export function OportunidadesView({
                         Sin oportunidades
                       </p>
                     ) : (
-                      itemsEtapa.map((op) => (
-                        <article
-                          key={op.id}
-                          className={`rounded-xl border p-3 shadow-sm transition hover:border-turquesa ${
-                            op.estado_comercial === 'perdida'
-                              ? 'border-red-800/25 bg-red-50/40'
-                              : 'border-tinta/15 bg-marfil/65'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-1.5">
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-turquesa">
-                              <Plane className="h-3.5 w-3.5" aria-hidden="true" />
-                              <span>{op.destino}</span>
-                            </span>
-                            <SedeBadge nombre={op.sede_nombre} />
-                          </div>
+                      itemsEtapa.map((op) => {
+                        const puedeAvanzar =
+                          op.estado_comercial !== 'perdida' && Number(op.etapa_orden) < 9;
 
-                          <h4 className="mt-1.5 text-xs font-bold text-tinta">
-                            {op.cliente_nombre}
-                          </h4>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <EstadoComercialBadge
-                              estado={op.estado_comercial}
-                              motivo={op.motivo_perdida_nombre}
-                            />
-                            <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-medium text-tinta/75">
-                              {op.canal}
-                            </span>
-                          </div>
-
-                          <div className="mt-2.5 space-y-1 border-t border-tinta/10 pt-2 text-[11px] text-tinta/75">
-                            <div className="flex items-center justify-between">
-                              <span className="inline-flex items-center gap-1">
-                                <Users className="h-3 w-3 text-turquesa" aria-hidden="true" />
-                                <span>{op.viajeros} viaj.</span>
+                        return (
+                          <article
+                            key={op.id}
+                            className={`rounded-xl border p-3 shadow-sm transition hover:border-turquesa ${
+                              op.estado_comercial === 'perdida'
+                                ? 'border-red-800/25 bg-red-50/40'
+                                : 'border-tinta/15 bg-marfil/65'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-turquesa">
+                                <Plane className="h-3.5 w-3.5" aria-hidden="true" />
+                                <span>{op.destino}</span>
                               </span>
-                              <span className="inline-flex items-center gap-1">
-                                <Calendar className="h-3 w-3 text-coral" aria-hidden="true" />
-                                <span>{formatearFechaCorta(op.fecha_salida)}</span>
+                              <SedeBadge nombre={op.sede_nombre} />
+                            </div>
+
+                            <h4 className="mt-1.5 text-xs font-bold text-tinta">
+                              {op.cliente_nombre}
+                            </h4>
+
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                              <EstadoComercialBadge
+                                estado={op.estado_comercial}
+                                motivo={op.motivo_perdida_nombre}
+                              />
+                              <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-medium text-tinta/75">
+                                {op.canal}
                               </span>
                             </div>
-                            <p className="font-semibold text-tinta">
-                              {formatearPresupuesto(op.presupuesto_total, op.moneda)}
-                            </p>
-                          </div>
 
-                          <button
-                            type="button"
-                            onClick={() => onAbrirOportunidad(op.id)}
-                            className="mt-2.5 inline-flex w-full items-center justify-center gap-1 rounded-lg bg-tinta px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-tinta-suave"
-                          >
-                            <span>Abrir ficha #{op.id}</span>
-                            <ArrowRight className="h-3 w-3" aria-hidden="true" />
-                          </button>
-                        </article>
-                      ))
+                            <div className="mt-2.5 space-y-1 border-t border-tinta/10 pt-2 text-[11px] text-tinta/75">
+                              <div className="flex items-center justify-between">
+                                <span className="inline-flex items-center gap-1">
+                                  <Users className="h-3 w-3 text-turquesa" aria-hidden="true" />
+                                  <span>{op.viajeros} viaj.</span>
+                                </span>
+                                <span className="inline-flex items-center gap-1">
+                                  <Calendar className="h-3 w-3 text-coral" aria-hidden="true" />
+                                  <span>{formatearFechaCorta(op.fecha_salida)}</span>
+                                </span>
+                              </div>
+                              <p className="font-semibold text-tinta">
+                                {formatearPresupuesto(op.presupuesto_total, op.moneda)}
+                              </p>
+                            </div>
+
+                            <div className="mt-2.5 flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => onAbrirOportunidad(op.id)}
+                                className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-tinta px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-tinta-suave"
+                              >
+                                <span>Ficha #{op.id}</span>
+                              </button>
+                              {puedeAvanzar ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    limpiarMensajes();
+                                    setOpParaAvanceRapido(op);
+                                  }}
+                                  title="Avanzar a la siguiente etapa con confirmación"
+                                  className="inline-flex items-center justify-center rounded-lg border border-turquesa/40 bg-turquesa-claro px-2 py-1.5 text-xs font-bold text-tinta hover:bg-turquesa hover:text-white"
+                                >
+                                  <span>+1</span>
+                                  <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                                </button>
+                              ) : null}
+                            </div>
+                          </article>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -710,7 +893,7 @@ export function OportunidadesView({
           </div>
         </section>
       ) : (
-        /* Vista alternativa de Tabla */
+        /* Vista alternativa de Tabla ordenable */
         <section
           aria-label="Tabla de oportunidades de viaje"
           className="overflow-hidden rounded-2xl border border-tinta/15 bg-white shadow-sm"
@@ -719,14 +902,69 @@ export function OportunidadesView({
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-tinta/15 bg-marfil text-tinta/75">
-                  <th className="px-4 py-3 font-semibold">ID</th>
-                  <th className="px-4 py-3 font-semibold">Cliente</th>
-                  <th className="px-4 py-3 font-semibold">Destino</th>
-                  <th className="px-4 py-3 font-semibold">Etapa actual</th>
+                  <th className="px-4 py-3 font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenTabla('id')}
+                      className="inline-flex items-center gap-1 font-semibold hover:text-tinta"
+                    >
+                      <span>ID</span>
+                      <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenTabla('cliente_nombre')}
+                      className="inline-flex items-center gap-1 font-semibold hover:text-tinta"
+                    >
+                      <span>Cliente</span>
+                      <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenTabla('destino')}
+                      className="inline-flex items-center gap-1 font-semibold hover:text-tinta"
+                    >
+                      <span>Destino</span>
+                      <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenTabla('etapa_orden')}
+                      className="inline-flex items-center gap-1 font-semibold hover:text-tinta"
+                    >
+                      <span>Etapa actual</span>
+                      <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </th>
                   <th className="px-4 py-3 font-semibold">Estado</th>
                   <th className="px-4 py-3 font-semibold">Sede / Canal</th>
                   <th className="px-4 py-3 font-semibold">Presupuesto declarado</th>
-                  <th className="px-4 py-3 font-semibold">Salida / Viajeros</th>
+                  <th className="px-4 py-3 font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenTabla('fecha_salida')}
+                      className="inline-flex items-center gap-1 font-semibold hover:text-tinta"
+                    >
+                      <span>Salida / Viajeros</span>
+                      <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenTabla('dias_sin_avance')}
+                      className="inline-flex items-center gap-1 font-semibold hover:text-tinta"
+                    >
+                      <span>Antigüedad</span>
+                      <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </th>
                   <th className="px-4 py-3 text-right font-semibold">Acción</th>
                 </tr>
               </thead>
@@ -763,6 +1001,9 @@ export function OportunidadesView({
                     </td>
                     <td className="px-4 py-3 text-tinta/80">
                       {formatearFechaCorta(op.fecha_salida)} ({op.viajeros} viaj.)
+                    </td>
+                    <td className="px-4 py-3 font-medium text-tinta/75">
+                      {op.dias_sin_avance ?? 0} d
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
