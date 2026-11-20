@@ -85,7 +85,7 @@ export const MOTIVOS_PERDIDA_CATALOGO = [
 ];
 
 export const CANALES_PERMITIDOS = ['Instagram', 'Referido', 'Web', 'WhatsApp'];
-export const MONEDAS_PERMITIDAS = ['MXN', 'USD', 'EUR'];
+export const MONEDAS_PERMITIDAS = ['CRC', 'USD'];
 export const DESTINOS_SEMILLA = ['Cancún', 'Oaxaca', 'Madrid', 'Bogotá'];
 
 // Distribución exacta requerida por las 9 etapas: suma = 40 oportunidades
@@ -126,10 +126,16 @@ const NOMBRES_CLIENTES_FICTICIOS = [
   'Óscar López Marin (Ficticio)'
 ];
 
-const PRESUPUESTOS_BASE_MXN = [
-  28500.00, 34200.00, 46800.00, 52000.00,
-  64500.00, 38900.00, 75000.00, 92400.00,
-  41500.00, 58300.00
+const PRESUPUESTOS_BASE_CRC = [
+  850000.00, 1250000.00, 1680000.00, 980000.00,
+  2150000.00, 1420000.00, 2750000.00, 3200000.00,
+  1100000.00, 1890000.00
+];
+
+const PRESUPUESTOS_BASE_USD = [
+  1650.00, 2400.00, 3200.00, 1900.00,
+  4100.00, 2750.00, 5200.00, 6400.00,
+  2150.00, 3600.00
 ];
 
 function restarDiasUTC(baseDate, dias, horasExtra = 0) {
@@ -197,7 +203,11 @@ export function construirSemillaReproducible(nowInput = new Date()) {
       const sedeId = (globalIndex % 2) + 1; // 1: Desamparados, 2: Puntarenas
       const destino = DESTINOS_SEMILLA[globalIndex % DESTINOS_SEMILLA.length];
       const canal = CANALES_PERMITIDOS[globalIndex % CANALES_PERMITIDOS.length];
-      const presupuesto = PRESUPUESTOS_BASE_MXN[globalIndex % PRESUPUESTOS_BASE_MXN.length] + ((k % 3) * 1500);
+      const moneda = globalIndex % 2 === 0 ? 'CRC' : 'USD';
+      const presupuesto =
+        moneda === 'CRC'
+          ? PRESUPUESTOS_BASE_CRC[globalIndex % PRESUPUESTOS_BASE_CRC.length] + ((k % 3) * 45000)
+          : PRESUPUESTOS_BASE_USD[globalIndex % PRESUPUESTOS_BASE_USD.length] + ((k % 3) * 150);
       const viajeros = (globalIndex % 4) + 1;
 
       // Días sin avance deliberadamente variados (entre 2 y 34 días) para alimentar la vista de Seguimientos
@@ -248,7 +258,7 @@ export function construirSemillaReproducible(nowInput = new Date()) {
         etapa_id: etapaActualId,
         destino,
         presupuesto_total: Number(presupuesto.toFixed(2)),
-        moneda: 'MXN',
+        moneda,
         viajeros,
         fecha_salida: formatearSoloFecha(salidaDate),
         canal,
