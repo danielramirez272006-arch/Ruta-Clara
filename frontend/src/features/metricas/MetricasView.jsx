@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   BarChart3,
   AlertTriangle,
   Calculator,
   XCircle,
   CheckCircle2,
-  Info
+  Printer,
+  Sliders,
+  MapPin,
+  Plane
 } from 'lucide-react';
 import {
   BrandRouteDivider,
@@ -25,6 +28,9 @@ export function MetricasView({
   onRecargar,
   onFiltrarOportunidadesPorEtapa
 }) {
+  // Simulador interactivo de meta para la etapa 4 ("Seguimiento de cotización")
+  const [avancesSimuladosExtra, setAvancesSimuladosExtra] = useState(0);
+
   if (cargando && !metricas) {
     return <LoadingState mensaje="Calculando métricas históricas y brechas del embudo..." />;
   }
@@ -53,7 +59,22 @@ export function MetricasView({
   const etapas = metricas.etapas || [];
   const mayorBrecha = metricas.mayor_brecha;
   const perdidasConfirmadas = metricas.perdidas_confirmadas || { total: 0, por_motivo: [] };
+  const comparativaSedes = metricas.comparativa_sedes || [];
+  const comparativaDestinos = metricas.comparativa_destinos || [];
   const etapaControl = etapas.find((e) => Number(e.orden) === 4);
+
+  // Cálculo del simulador interactivo sobre la etapa 4
+  const maxSimulable = etapaControl ? Number(etapaControl.actuales_abiertas || 15) : 15;
+  const alcanzaronSim = etapaControl ? Number(etapaControl.alcanzaron) : 29;
+  const avanzaronBase = etapaControl ? Number(etapaControl.avanzaron) : 11;
+  const metaSim = etapaControl && etapaControl.meta !== null ? Number(etapaControl.meta) : 80;
+  const avanzaronSim = Math.min(alcanzaronSim, avanzaronBase + Number(avancesSimuladosExtra));
+  const conversionSim = alcanzaronSim > 0 ? (avanzaronSim / alcanzaronSim) * 100 : 0;
+  const brechaSim = Math.max(0, metaSim - conversionSim);
+  const faltantesSim = Math.max(
+    0,
+    Math.ceil((alcanzaronSim * metaSim) / 100) - avanzaronSim
+  );
 
   return (
     <div className="space-y-6">
@@ -74,11 +95,20 @@ export function MetricasView({
               Los cálculos se realizan sin redondear valores intermedios; el redondeo se aplica únicamente en la presentación visual. Las oportunidades perdidas permanecen en los denominadores históricos.
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="no-print inline-flex items-center gap-2 rounded-xl border border-tinta/20 bg-marfil px-4 py-2.5 text-xs font-semibold text-tinta shadow-sm hover:bg-marfil-oscuro"
+          >
+            <Printer className="h-4 w-4 text-turquesa" aria-hidden="true" />
+            <span>Imprimir / Guardar PDF</span>
+          </button>
         </div>
         <BrandRouteDivider className="mt-4" label="Diagnóstico por transición" />
       </header>
 
-      {/* Distinción conceptual entre Fuga observada y Pérdida confirmada + Análisis en 5 líneas */}
+      {/* Análisis de la fuga en 5 líneas + Valores de Control */}
       <section
         aria-labelledby="titulo-distincion-fuga"
         className="grid grid-cols-1 gap-6 lg:grid-cols-12"
@@ -98,7 +128,7 @@ export function MetricasView({
               <strong>2. Volumen estancado:</strong> De las <strong>29 oportunidades</strong> que alcanzaron esta etapa, solo <strong>11 avanzaron</strong> a &ldquo;Propuesta aceptada&rdquo; (conversión de <strong>37,93%</strong> y fuga observada de <strong>62,07%</strong>).
             </li>
             <li>
-              <strong>3. Fuga observada vs. pérdida confirmada:</strong> De las 18 oportunidades que no han avanzado desde la etapa 4, la mayoría siguen <em>abiertas y pendientes de seguimiento</em>; una oportunidad pendiente no implica abandono definitivo.
+              <strong>3. Fuga observada vs. pérdida confirmada:</strong> De las 18 oportunidades que no han avanzado desde la etapa 4, 15 siguen <em>abiertas y pendientes de seguimiento</em> y solo 3 son pérdidas confirmadas; una oportunidad pendiente no implica abandono definitivo.
             </li>
             <li>
               <strong>4. Meta operativa:</strong> Con la fórmula <code>máximo(0, techo(29 × 80 / 100) − 11)</code>, faltan exactamente <strong>13 oportunidades</strong> que avancen a la etapa 5 para alcanzar la meta del 80%.
@@ -167,6 +197,95 @@ export function MetricasView({
         ) : null}
       </section>
 
+      {/* Simulador Interactivo de Meta para Presentación Académica */}
+      {etapaControl ? (
+        <section
+          aria-labelledby="titulo-simulador-meta"
+          className="no-print rounded-2xl border border-turquesa/35 bg-white p-6 shadow-sm"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="rounded-xl bg-turquesa-claro p-2 text-turquesa">
+                <Sliders className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 id="titulo-simulador-meta" className="font-editorial text-lg font-bold text-tinta">
+                  Simulador didáctico de meta — Etapa 4 (Seguimiento de cotización)
+                </h2>
+                <p className="text-xs text-tinta/70">
+                  Mueva el control para simular qué ocurre con la conversión y la brecha si el equipo logra destrabar entre 0 y {maxSimulable} de las cotizaciones actualmente abiertas en esta etapa.
+                </p>
+              </div>
+            </div>
+            {avancesSimuladosExtra > 0 ? (
+              <button
+                type="button"
+                onClick={() => setAvancesSimuladosExtra(0)}
+                className="rounded-lg border border-tinta/20 bg-marfil px-3 py-1 text-xs font-semibold text-tinta"
+              >
+                Restablecer a 0
+              </button>
+            ) : null}
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12 items-center">
+            <div className="lg:col-span-5 space-y-2">
+              <label htmlFor="slider-simulador-etapa4" className="flex justify-between text-xs font-semibold text-tinta">
+                <span>Cotizaciones abiertas destrabadas:</span>
+                <span className="text-turquesa font-bold">+{avancesSimuladosExtra} avances</span>
+              </label>
+              <input
+                id="slider-simulador-etapa4"
+                type="range"
+                min={0}
+                max={maxSimulable}
+                value={avancesSimuladosExtra}
+                onChange={(e) => setAvancesSimuladosExtra(Number(e.target.value))}
+                className="w-full accent-turquesa cursor-pointer"
+              />
+              <div className="flex justify-between text-[11px] text-tinta/60">
+                <span>Actual (0 extra)</span>
+                <span>Meta cumplida (+13)</span>
+                <span>Máximo abierto (+{maxSimulable})</span>
+              </div>
+            </div>
+
+            <div className="lg:col-span-7 grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs">
+              <div className="rounded-xl bg-marfil/70 p-3">
+                <p className="text-tinta/70">Avanzaron simulados</p>
+                <p className="mt-0.5 font-editorial text-xl font-bold text-tinta">
+                  {avanzaronSim} / {alcanzaronSim}
+                </p>
+              </div>
+              <div className="rounded-xl bg-marfil/70 p-3">
+                <p className="text-tinta/70">Conversión resultante</p>
+                <p className="mt-0.5 font-editorial text-xl font-bold text-turquesa">
+                  {formatearPorcentaje(conversionSim)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-marfil/70 p-3">
+                <p className="text-tinta/70">Brecha frente a 80%</p>
+                <p className="mt-0.5 font-editorial text-xl font-bold text-tinta">
+                  {formatearPuntosPorcentuales(brechaSim)}
+                </p>
+              </div>
+              <div
+                className={`rounded-xl border p-3 ${
+                  faltantesSim === 0
+                    ? 'border-emerald-800/30 bg-emerald-50 text-emerald-950'
+                    : 'border-coral/40 bg-coral-claro/60 text-tinta'
+                }`}
+              >
+                <p className="font-semibold">Faltantes restantes</p>
+                <p className="mt-0.5 font-editorial text-xl font-bold">
+                  {faltantesSim === 0 ? '¡Meta alcanzada!' : `${faltantesSim} viajes`}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {/* Tabla completa de las 9 etapas del embudo */}
       <section
         aria-labelledby="titulo-tabla-metricas"
@@ -177,7 +296,7 @@ export function MetricasView({
             Matriz de conversión por las 9 etapas del embudo
           </h2>
           <p className="text-xs text-tinta/70">
-            La etapa 9 (&ldquo;Seguimiento posviaje&rdquo;) cierra el ciclo comercial y no tiene transición posterior (devuelve <code>null</code> / &ldquo;—&rdquo;).
+            Haga clic en el nombre de cualquier etapa para abrir el tablero filtrado. La etapa 9 (&ldquo;Seguimiento posviaje&rdquo;) cierra el ciclo comercial y no tiene transición posterior (devuelve <code>null</code> / &ldquo;—&rdquo;).
           </p>
         </div>
 
@@ -275,6 +394,101 @@ export function MetricasView({
           </table>
         </div>
       </section>
+
+      {/* Comparativa por Sede y por Destino */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section
+          aria-labelledby="titulo-comparativa-sedes"
+          className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm"
+        >
+          <div className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-turquesa" aria-hidden="true" />
+            <h2 id="titulo-comparativa-sedes" className="font-editorial text-lg font-bold text-tinta">
+              Desempeño comparativo por sede
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-tinta/70">
+            Distribución operativa entre las sedes Desamparados y Puntarenas.
+          </p>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-tinta/15 text-tinta/70">
+                  <th className="py-2 font-semibold">Sede</th>
+                  <th className="py-2 text-right font-semibold">Total</th>
+                  <th className="py-2 text-right font-semibold">Activas</th>
+                  <th className="py-2 text-right font-semibold">En Etapa 4</th>
+                  <th className="py-2 text-right font-semibold">Reservas (≥7)</th>
+                  <th className="py-2 text-right font-semibold">Perdidas</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-tinta/10">
+                {comparativaSedes.map((s) => (
+                  <tr key={s.sede_id}>
+                    <td className="py-2.5 font-bold text-tinta">{s.sede_nombre}</td>
+                    <td className="py-2.5 text-right font-semibold">{s.total}</td>
+                    <td className="py-2.5 text-right text-turquesa font-semibold">{s.activas}</td>
+                    <td className="py-2.5 text-right font-semibold text-tinta">
+                      {s.en_seguimiento_cotizacion}
+                    </td>
+                    <td className="py-2.5 text-right text-emerald-800 font-semibold">
+                      {s.reservas_o_superior}
+                    </td>
+                    <td className="py-2.5 text-right text-red-800 font-semibold">{s.perdidas}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="titulo-comparativa-destinos"
+          className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm"
+        >
+          <div className="flex items-center gap-2">
+            <Plane className="h-5 w-5 text-coral" aria-hidden="true" />
+            <h2 id="titulo-comparativa-destinos" className="font-editorial text-lg font-bold text-tinta">
+              Demanda y conversión por destino
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-tinta/70">
+            Concentración de cotizaciones, reservas y pérdidas por destino de interés.
+          </p>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-tinta/15 text-tinta/70">
+                  <th className="py-2 font-semibold">Destino</th>
+                  <th className="py-2 text-right font-semibold">Total</th>
+                  <th className="py-2 text-right font-semibold">Activas</th>
+                  <th className="py-2 text-right font-semibold">En Etapa 4</th>
+                  <th className="py-2 text-right font-semibold">Reservas (≥7)</th>
+                  <th className="py-2 text-right font-semibold">Perdidas</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-tinta/10">
+                {comparativaDestinos.map((d) => (
+                  <tr key={d.destino}>
+                    <td className="py-2.5 font-bold text-tinta">{d.destino}</td>
+                    <td className="py-2.5 text-right font-semibold">{d.total}</td>
+                    <td className="py-2.5 text-right text-turquesa font-semibold">{d.activas}</td>
+                    <td className="py-2.5 text-right font-semibold text-tinta">
+                      {d.en_seguimiento_cotizacion}
+                    </td>
+                    <td className="py-2.5 text-right text-emerald-800 font-semibold">
+                      {d.reservas_o_superior}
+                    </td>
+                    <td className="py-2.5 text-right text-red-800 font-semibold">{d.perdidas}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
 
       {/* Pérdidas confirmadas por motivo + Explicación de las fórmulas */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
