@@ -146,18 +146,36 @@ export const apiService = {
     });
   },
 
-  async generarMensajeIA(id) {
+  async generarMensajeIA(id, tono = 'cálido y consultivo') {
     return request(`/prospectos/${id}/mensaje`, {
       method: 'POST',
-      body: JSON.stringify({})
+      body: JSON.stringify({ tono })
+    });
+  },
+
+  async agregarNotaOportunidad(id, payload) {
+    return request(`/prospectos/${id}/notas`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
     });
   },
 
   // Campañas con IA
+  async listarCampanasGuardadas() {
+    return request('/campanas');
+  },
+
   async generarCampanaIA(payload) {
     return request('/campanas', {
       method: 'POST',
       body: JSON.stringify(payload)
+    });
+  },
+
+  async aprobarCampanaIA(id) {
+    return request(`/campanas/${id}/aprobar`, {
+      method: 'PATCH',
+      body: JSON.stringify({})
     });
   }
 };
