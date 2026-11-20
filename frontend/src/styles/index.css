@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-marfil: #F7F5EF;
+    --color-tinta: #152D39;
+    --color-turquesa: #126F7C;
+    --color-coral: #D98164;
+  }
+
+  body {
+    background-color: #F7F5EF;
+    color: #152D39;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, .font-editorial {
+    font-family: 'Fraunces', Georgia, serif;
+  }
+
+  /* Foco visible accesible para navegación por teclado */
+  *:focus-visible {
+    outline: 2.5px solid #126F7C;
+    outline-offset: 2px;
+  }
+}
+
+/* Detalle de marca: línea de recorrido con puntos */
+.ruta-brand-line {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ruta-brand-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background-color: #D98164;
+  flex-shrink: 0;
+}
+
+.ruta-brand-dot-turquesa {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background-color: #126F7C;
+  flex-shrink: 0;
+}
+
+.ruta-brand-track {
+  height: 1.5px;
+  flex: 1;
+  background: linear-gradient(90deg, #126F7C 0%, #D98164 100%);
+  opacity: 0.45;
+}
