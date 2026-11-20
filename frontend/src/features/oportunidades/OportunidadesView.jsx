@@ -70,8 +70,8 @@ export function OportunidadesView({
     destino: 'Oaxaca',
     sede_id: '1',
     canal: 'WhatsApp',
-    presupuesto_total: '45000',
-    moneda: 'MXN',
+    presupuesto_total: '1250000',
+    moneda: 'CRC',
     viajeros: '2',
     fecha_salida: '2027-02-15'
   });
@@ -280,7 +280,7 @@ export function OportunidadesView({
               Oportunidades de viaje (9 etapas)
             </h1>
             <p className="mt-1 text-sm text-tinta/75">
-              Consulte el tablero Kanban o la vista de tabla ordenable. Los presupuestos declarados están en MXN, USD o EUR y nunca se suman entre monedas distintas ni se presentan como ingresos.
+              Consulte el tablero Kanban o la vista de tabla ordenable. Los presupuestos declarados están en Colones costarricenses (CRC) o Dólares (USD) y nunca se suman entre monedas distintas ni se presentan como ingresos.
             </p>
           </div>
 
@@ -546,7 +546,7 @@ export function OportunidadesView({
               >
                 {MONEDAS_LISTA.map((m) => (
                   <option key={m} value={m}>
-                    {m}
+                    {m === 'CRC' ? 'CRC (₡ Colón costarricense)' : 'USD ($ Dólar)'}
                   </option>
                 ))}
               </select>

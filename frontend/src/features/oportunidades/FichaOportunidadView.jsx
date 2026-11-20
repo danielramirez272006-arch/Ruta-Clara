@@ -108,7 +108,7 @@ export function FichaOportunidadView({
   const [formPref, setFormPref] = useState({
     destino: '',
     presupuesto_total: '',
-    moneda: 'MXN',
+    moneda: 'CRC',
     viajeros: '1',
     fecha_salida: '',
     sede_id: '1',
@@ -648,7 +648,7 @@ export function FichaOportunidadView({
                   >
                     {MONEDAS_LISTA.map((m) => (
                       <option key={m} value={m}>
-                        {m}
+                        {m === 'CRC' ? 'CRC (₡ Colón costarricense)' : 'USD ($ Dólar)'}
                       </option>
                     ))}
                   </select>
