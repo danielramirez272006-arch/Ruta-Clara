@@ -152,11 +152,16 @@ export function formatearSoloFecha(dateObj) {
 export function construirSemillaReproducible(nowInput = new Date()) {
   const now = new Date(nowInput);
 
+  const canalesContacto = ['WhatsApp', 'Correo', 'Llamada', 'Instagram'];
   const clientes = NOMBRES_CLIENTES_FICTICIOS.map((nombre, idx) => {
     const creadoDate = restarDiasUTC(now, 95 - idx, idx % 6);
+    const numId = idx + 1;
     return {
-      id: idx + 1,
+      id: numId,
       nombre: nombre.replace('AlfaroPorras', 'Alfaro Porras'),
+      telefono: `+506 8000-${String(1000 + numId)} (Ficticio)`,
+      correo: `viajero${numId}@rutaclara-demo.cr`,
+      preferencia_contacto: canalesContacto[idx % canalesContacto.length],
       es_ficticio: 1,
       creado_en: formatearFechaMySQL(creadoDate)
     };
@@ -270,6 +275,30 @@ export function construirSemillaReproducible(nowInput = new Date()) {
     }
   }
 
+  const notas_oportunidad = [
+    {
+      id: 1,
+      oportunidad_id: 12,
+      autor: 'Asesor Ruta Clara',
+      texto: 'Solicitó opciones de hotel boutique en La Candelaria y guía gastronómico para 4 personas.',
+      fecha: formatearFechaMySQL(restarDiasUTC(now, 2, 3))
+    },
+    {
+      id: 2,
+      oportunidad_id: 14,
+      autor: 'Asesor Ruta Clara',
+      texto: 'Interesados en ruta artesanal por Oaxaca y Monte Albán; prefieren vuelos con escala corta.',
+      fecha: formatearFechaMySQL(restarDiasUTC(now, 3, 2))
+    },
+    {
+      id: 3,
+      oportunidad_id: 15,
+      autor: 'Asesor Ruta Clara',
+      texto: 'Revisando fechas de vacaciones laborales para confirmar propuesta hacia Madrid.',
+      fecha: formatearFechaMySQL(restarDiasUTC(now, 4, 5))
+    }
+  ];
+
   return {
     sedes: SEDES_CATALOGO.map((s) => ({ ...s })),
     etapas: ETAPAS_CATALOGO.map((e) => ({ ...e })),
@@ -277,6 +306,8 @@ export function construirSemillaReproducible(nowInput = new Date()) {
     clientes,
     oportunidades,
     historial_etapas,
-    eventos_comerciales
+    eventos_comerciales,
+    notas_oportunidad,
+    campanas_guardadas: []
   };
 }
