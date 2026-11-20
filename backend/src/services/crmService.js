@@ -104,6 +104,9 @@ export class CrmService {
     const creadoEn = fechaActualUTCMySQL();
     const nuevo = await this.clienteRepo.crearCliente({
       nombre: payload.nombre,
+      telefono: payload.telefono ?? null,
+      correo: payload.correo ?? null,
+      preferencia_contacto: payload.preferencia_contacto || 'WhatsApp',
       es_ficticio: payload.es_ficticio ?? 1,
       creado_en: creadoEn
     });
@@ -158,10 +161,11 @@ export class CrmService {
       );
     }
 
-    const [historialEtapas, eventosComerciales, etapas] = await Promise.all([
+    const [historialEtapas, eventosComerciales, etapas, notas] = await Promise.all([
       this.oportunidadRepo.listarHistorialDeOportunidad(oportunidadId),
       this.oportunidadRepo.listarEventosDeOportunidad(oportunidadId),
-      this.catalogoRepo.listarEtapas()
+      this.catalogoRepo.listarEtapas(),
+      this.oportunidadRepo.listarNotasDeOportunidad(oportunidadId)
     ]);
 
     const op = this._enriquecerOportunidad(opRaw);
@@ -207,8 +211,30 @@ export class CrmService {
         : null,
       historial_etapas: historialEtapas,
       eventos_comerciales: eventosComerciales,
+      notas_agente: notas,
       cronologia
     };
+  }
+
+  async agregarNotaOportunidad(oportunidadId, payloadNota) {
+    const op = await this.oportunidadRepo.obtenerOportunidadPorId(oportunidadId);
+    if (!op) {
+      throw new AppError(
+        `No se encontró la oportunidad con ID ${oportunidadId}.`,
+        404,
+        'OPORTUNIDAD_NO_ENCONTRADA'
+      );
+    }
+
+    const fechaUTC = fechaActualUTCMySQL();
+    await this.oportunidadRepo.crearNotaOportunidad({
+      oportunidad_id: oportunidadId,
+      autor: payloadNota.autor || 'Asesor Ruta Clara',
+      texto: payloadNota.texto,
+      fecha: fechaUTC
+    });
+
+    return this.obtenerFichaOportunidad(oportunidadId);
   }
 
   /**
@@ -593,7 +619,7 @@ export class CrmService {
     };
   }
 
-  async generarMensajeIA(oportunidadId) {
+  async generarMensajeIA(oportunidadId, opciones = {}) {
     const op = await this.obtenerFichaOportunidad(oportunidadId);
 
     if (op.estado_comercial === 'perdida') {
@@ -604,17 +630,28 @@ export class CrmService {
       );
     }
 
-    return this.claudeIntegration.generarMensajeSeguimiento(op);
+    return this.claudeIntegration.generarMensajeSeguimiento(op, opciones);
+  }
+
+  async listarCampanasGuardadas() {
+    return this.oportunidadRepo.listarCampanasGuardadas();
+  }
+
+  async aprobarCampanaGuardada(campanaId) {
+    await this.oportunidadRepo.actualizarEstadoCampana(campanaId, 'Aprobada por el agente');
+    return this.oportunidadRepo.listarCampanasGuardadas();
   }
 
   async generarCampanaIA(payloadValidado) {
     let nombreSede = payloadValidado.sede_nombre;
+    let idSede = payloadValidado.sede_id || 1;
     if (payloadValidado.sede_id) {
       const sede = await this.catalogoRepo.obtenerSedePorId(payloadValidado.sede_id);
       if (!sede) {
         throw new AppError(`La sede con ID ${payloadValidado.sede_id} no existe.`, 400, 'SEDE_NO_EXISTE');
       }
       nombreSede = sede.nombre;
+      idSede = sede.id;
     } else if (nombreSede) {
       const sedePorNombre = await this.catalogoRepo.obtenerSedePorNombre(nombreSede);
       if (!sedePorNombre) {
@@ -625,12 +662,29 @@ export class CrmService {
         );
       }
       nombreSede = sedePorNombre.nombre;
+      idSede = sedePorNombre.id;
     }
 
-    return this.claudeIntegration.generarBorradoresCampana({
+    const generada = await this.claudeIntegration.generarBorradoresCampana({
       objetivo: payloadValidado.objetivo,
       sede: nombreSede
     });
+
+    const idGuardada = await this.oportunidadRepo.guardarCampanaGenerada({
+      sede_id: idSede,
+      sede_nombre: nombreSede,
+      objetivo: payloadValidado.objetivo,
+      proveedor: generada.proveedor,
+      modelo: generada.modelo,
+      estado: generada.estado,
+      borradores: generada.borradores,
+      creado_en: fechaActualUTCMySQL()
+    });
+
+    return {
+      ...generada,
+      id: idGuardada
+    };
   }
 
   async exportarDatosFicticiosJSON() {
