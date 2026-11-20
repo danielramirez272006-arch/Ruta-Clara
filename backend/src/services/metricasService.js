@@ -170,6 +170,68 @@ export function calcularMetricasEmbudo({ etapas, oportunidades, historialEtapas,
     }
   }
 
+  // Comparativa por Sede (Desamparados vs Puntarenas)
+  const mapaSedes = new Map();
+  for (const op of oportunidades) {
+    const sId = Number(op.sede_id);
+    const sNombre = op.sede_nombre || (sId === 1 ? 'Desamparados' : 'Puntarenas');
+    if (!mapaSedes.has(sId)) {
+      mapaSedes.set(sId, {
+        sede_id: sId,
+        sede_nombre: sNombre,
+        total: 0,
+        activas: 0,
+        en_seguimiento_cotizacion: 0,
+        reservas_o_superior: 0,
+        perdidas: 0
+      });
+    }
+    const item = mapaSedes.get(sId);
+    const orden = Number(op.etapa_orden || op.etapa_id);
+    item.total += 1;
+    if (op.estado_comercial === 'perdida') {
+      item.perdidas += 1;
+    } else if (orden < 9) {
+      item.activas += 1;
+    }
+    if (orden === 4) {
+      item.en_seguimiento_cotizacion += 1;
+    }
+    if (orden >= 7) {
+      item.reservas_o_superior += 1;
+    }
+  }
+
+  // Comparativa por Destino (Cancún, Oaxaca, Madrid, Bogotá, etc.)
+  const mapaDestinos = new Map();
+  for (const op of oportunidades) {
+    const dest = op.destino || 'Otro';
+    if (!mapaDestinos.has(dest)) {
+      mapaDestinos.set(dest, {
+        destino: dest,
+        total: 0,
+        activas: 0,
+        en_seguimiento_cotizacion: 0,
+        reservas_o_superior: 0,
+        perdidas: 0
+      });
+    }
+    const dItem = mapaDestinos.get(dest);
+    const orden = Number(op.etapa_orden || op.etapa_id);
+    dItem.total += 1;
+    if (op.estado_comercial === 'perdida') {
+      dItem.perdidas += 1;
+    } else if (orden < 9) {
+      dItem.activas += 1;
+    }
+    if (orden === 4) {
+      dItem.en_seguimiento_cotizacion += 1;
+    }
+    if (orden >= 7) {
+      dItem.reservas_o_superior += 1;
+    }
+  }
+
   return {
     etapas: resultadoEtapas,
     mayor_brecha: mayorBrecha,
@@ -177,6 +239,8 @@ export function calcularMetricasEmbudo({ etapas, oportunidades, historialEtapas,
       total: perdidasTotales.length,
       por_motivo: Array.from(conteoPorMotivo.values()).sort((a, b) => b.cantidad - a.cantidad || a.motivo_id - b.motivo_id)
     },
+    comparativa_sedes: Array.from(mapaSedes.values()).sort((a, b) => a.sede_id - b.sede_id),
+    comparativa_destinos: Array.from(mapaDestinos.values()).sort((a, b) => b.total - a.total),
     explicacion_formulas: {
       actuales: 'Oportunidades ubicadas actualmente en la etapa.',
       alcanzaron: 'Oportunidades distintas cuyo historial contiene esa etapa (incluye abiertas, cerradas y perdidas).',
