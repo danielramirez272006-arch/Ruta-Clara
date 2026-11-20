@@ -61,6 +61,13 @@ export const apiService = {
     return request('/exportar');
   },
 
+  async restaurarSemillaAcademica() {
+    return request('/semilla/restaurar', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+  },
+
   // Resumen e inicio
   async obtenerResumen(dias = 7) {
     return request(`/resumen?dias=${encodeURIComponent(dias)}`);
