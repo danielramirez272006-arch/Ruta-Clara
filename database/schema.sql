@@ -11,6 +11,8 @@ CREATE DATABASE IF NOT EXISTS ruta_clara
 USE ruta_clara;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS campanas_guardadas;
+DROP TABLE IF EXISTS notas_oportunidad;
 DROP TABLE IF EXISTS eventos_comerciales;
 DROP TABLE IF EXISTS historial_etapas;
 DROP TABLE IF EXISTS oportunidades;
@@ -43,10 +45,14 @@ CREATE TABLE motivos_perdida (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Entidad de clientes (un cliente puede tener múltiples oportunidades de viaje)
+-- Nota: teléfono y correo son opcionales para gestión del asesor y NUNCA se envían a la IA.
 CREATE TABLE clientes (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(140) NOT NULL,
-  es_ficticio TINYINT(1) NOT NULL DEFAULT 1,
+  telefono VARCHAR(40) NULL,
+  correo VARCHAR(140) NULL,
+  preferencia_contacto VARCHAR(40) NOT NULL DEFAULT 'WhatsApp',
+  es_ficticio TINYINT NOT NULL DEFAULT 1,
   creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_clientes_nombre CHECK (CHAR_LENGTH(TRIM(nombre)) >= 2),
   CONSTRAINT chk_clientes_ficticio CHECK (es_ficticio IN (0, 1))
@@ -96,8 +102,8 @@ CREATE TABLE historial_etapas (
   oportunidad_id INT UNSIGNED NOT NULL,
   etapa_id INT UNSIGNED NOT NULL,
   fecha DATETIME NOT NULL,
-  CONSTRAINT fk_historial_oportunidad FOREIGN KEY (oportunidad_id) REFERENCES oportunidades(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_historial_etapa FOREIGN KEY (etapa_id) REFERENCES etapas(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_historial_oportunidad FOREIGN KEY (oportunidad_id) REFERENCES oportunidades(id) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT fk_historial_etapa FOREIGN KEY (etapa_id) REFERENCES etapas(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   UNIQUE KEY uq_historial_oportunidad_etapa (oportunidad_id, etapa_id),
   INDEX idx_historial_etapa_oportunidad (etapa_id, oportunidad_id),
   INDEX idx_historial_oportunidad_fecha (oportunidad_id, fecha)
@@ -121,6 +127,33 @@ CREATE TABLE eventos_comerciales (
   ),
   INDEX idx_eventos_oportunidad_fecha (oportunidad_id, fecha),
   INDEX idx_eventos_tipo_motivo (tipo, motivo_perdida_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 8. Bitácora de notas del agente por oportunidad
+CREATE TABLE notas_oportunidad (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  oportunidad_id INT UNSIGNED NOT NULL,
+  autor VARCHAR(80) NOT NULL DEFAULT 'Asesor Ruta Clara',
+  texto VARCHAR(600) NOT NULL,
+  fecha DATETIME NOT NULL,
+  CONSTRAINT fk_notas_oportunidad FOREIGN KEY (oportunidad_id) REFERENCES oportunidades(id) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT chk_notas_texto CHECK (CHAR_LENGTH(TRIM(texto)) >= 2),
+  INDEX idx_notas_oportunidad_fecha (oportunidad_id, fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 9. Historial de campañas de redes sociales generadas con IA
+CREATE TABLE campanas_guardadas (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  sede_id INT UNSIGNED NOT NULL,
+  sede_nombre VARCHAR(80) NOT NULL,
+  objetivo VARCHAR(300) NOT NULL,
+  proveedor VARCHAR(40) NOT NULL DEFAULT 'DeepSeek',
+  modelo VARCHAR(80) NOT NULL,
+  estado VARCHAR(40) NOT NULL DEFAULT 'Pendiente de aprobación',
+  borradores_json JSON NOT NULL,
+  creado_en DATETIME NOT NULL,
+  CONSTRAINT fk_campanas_sede FOREIGN KEY (sede_id) REFERENCES sedes(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  INDEX idx_campanas_fecha (creado_en)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Catálogos base obligatorios
