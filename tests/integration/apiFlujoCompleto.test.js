@@ -104,17 +104,22 @@ class TransactionalMemoryPool {
     }
 
     // Clientes
-    if (q.startsWith('SELECT c.id, c.nombre, c.es_ficticio, c.creado_en FROM clientes c')) {
+    if (q.includes('FROM clientes c')) {
       let rows = [...this.state.clientes];
-      if (q.includes('WHERE LOWER(c.nombre) LIKE LOWER(?)')) {
+      if (q.includes('WHERE (LOWER(c.nombre) LIKE LOWER(?)')) {
         const needle = String(params[0]).replace(/%/g, '').toLowerCase();
-        rows = rows.filter((c) => c.nombre.toLowerCase().includes(needle));
+        rows = rows.filter(
+          (c) =>
+            c.nombre.toLowerCase().includes(needle) ||
+            String(c.correo || '').toLowerCase().includes(needle) ||
+            String(c.telefono || '').toLowerCase().includes(needle)
+        );
       }
       rows.sort((a, b) => b.id - a.id);
       return [rows];
     }
 
-    if (q.startsWith('SELECT id, nombre, es_ficticio, creado_en FROM clientes WHERE id = ?')) {
+    if (q.includes('FROM clientes WHERE id = ?')) {
       const row = this.state.clientes.find((c) => c.id === Number(params[0]));
       return [row ? [row] : []];
     }
@@ -125,8 +130,11 @@ class TransactionalMemoryPool {
       this.state.clientes.push({
         id: nextId,
         nombre: params[0],
-        es_ficticio: params[1],
-        creado_en: params[2]
+        telefono: params[1],
+        correo: params[2],
+        preferencia_contacto: params[3],
+        es_ficticio: params[4],
+        creado_en: params[5]
       });
       return [{ insertId: nextId }];
     }
@@ -300,6 +308,50 @@ class TransactionalMemoryPool {
 
     if (q.includes('FROM eventos_comerciales ev')) {
       return [this.state.eventos_comerciales];
+    }
+
+    if (q.includes('FROM notas_oportunidad')) {
+      const opId = Number(params[0]);
+      const rows = (this.state.notas_oportunidad || []).filter(
+        (n) => Number(n.oportunidad_id) === opId
+      );
+      return [rows];
+    }
+
+    if (q.startsWith('INSERT INTO notas_oportunidad')) {
+      if (!this.state.notas_oportunidad) this.state.notas_oportunidad = [];
+      const nextId =
+        this.state.notas_oportunidad.reduce((max, n) => Math.max(max, n.id), 0) + 1;
+      this.state.notas_oportunidad.push({
+        id: nextId,
+        oportunidad_id: Number(params[0]),
+        autor: params[1],
+        texto: params[2],
+        fecha: params[3]
+      });
+      return [{ insertId: nextId }];
+    }
+
+    if (q.includes('FROM campanas_guardadas')) {
+      return [this.state.campanas_guardadas || []];
+    }
+
+    if (q.startsWith('INSERT INTO campanas_guardadas')) {
+      if (!this.state.campanas_guardadas) this.state.campanas_guardadas = [];
+      const nextId =
+        this.state.campanas_guardadas.reduce((max, c) => Math.max(max, c.id), 0) + 1;
+      this.state.campanas_guardadas.push({
+        id: nextId,
+        sede_id: Number(params[0]),
+        sede_nombre: params[1],
+        objetivo: params[2],
+        proveedor: params[3],
+        modelo: params[4],
+        estado: params[5],
+        borradores_json: params[6],
+        creado_en: params[7]
+      });
+      return [{ insertId: nextId }];
     }
 
     throw new Error(`Consulta SQL no contemplada en pool de prueba: ${q}`);
