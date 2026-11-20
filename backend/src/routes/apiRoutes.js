@@ -30,6 +30,7 @@ export function crearRutasCrm(controller) {
   // Salud y configuración
   router.get('/health', controller.health);
   router.get('/exportar', controller.exportarDatos);
+  router.post('/semilla/restaurar', controller.restaurarSemilla);
 
   // Resumen e indicadores de inicio
   router.get('/resumen', controller.obtenerResumen);
