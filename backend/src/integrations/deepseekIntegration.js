@@ -23,7 +23,8 @@ export function construirPromptMensajeOportunidad({
   presupuesto_total,
   moneda,
   viajeros,
-  fecha_salida
+  fecha_salida,
+  tono = 'cálido y consultivo'
 }) {
   return [
     'Eres un asistente editorial para un asesor de la agencia de viajes boutique "Ruta Clara".',
@@ -37,9 +38,10 @@ export function construirPromptMensajeOportunidad({
     `- Presupuesto declarado: ${Number(presupuesto_total).toFixed(2)} ${moneda}`,
     `- Número de viajeros: ${viajeros}`,
     `- Fecha preferida de salida: ${fecha_salida}`,
+    `- Tono solicitado por el asesor: ${tono}`,
     '',
     'REGLAS ESTRICTAS DE REDACCIÓN:',
-    '1. Escribe exclusivamente en español, con tono cálido, profesional y claro.',
+    `1. Escribe exclusivamente en español, con tono ${tono}, profesional y claro.`,
     '2. Extensión máxima obligatoria: 100 palabras.',
     '3. NO inventes precios, tarifas adicionales, descuentos, cupos, disponibilidad de vuelos/hoteles, requisitos migratorios, visados, confirmaciones de pago ni reservas.',
     '4. No incluyas nombres propios ni datos de contacto; usa un saludo cordial neutro (por ejemplo: "Hola, un gusto saludarle desde Ruta Clara...").',
@@ -215,7 +217,12 @@ export class DeepSeekIntegration {
     };
   }
 
-  async generarMensajeSeguimiento(contextoOportunidad) {
+  async generarMensajeSeguimiento(contextoOportunidad, opciones = {}) {
+    const tono =
+      typeof opciones.tono === 'string' && opciones.tono.trim().length > 0
+        ? opciones.tono.trim()
+        : 'cálido y consultivo';
+
     const promptSeguro = construirPromptMensajeOportunidad({
       etapa: contextoOportunidad.etapa_nombre,
       sede: contextoOportunidad.sede_nombre,
@@ -224,7 +231,8 @@ export class DeepSeekIntegration {
       presupuesto_total: contextoOportunidad.presupuesto_total,
       moneda: contextoOportunidad.moneda,
       viajeros: contextoOportunidad.viajeros,
-      fecha_salida: contextoOportunidad.fecha_salida
+      fecha_salida: contextoOportunidad.fecha_salida,
+      tono
     });
 
     const { texto, modelo, proveedor } = await this._llamarProveedorIA(promptSeguro, 300);
