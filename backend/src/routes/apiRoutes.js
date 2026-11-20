@@ -54,9 +54,12 @@ export function crearRutasCrm(controller) {
   router.patch('/prospectos/:id/preferencias', controller.editarPreferenciasProspecto);
   router.patch('/prospectos/:id/estado', controller.cambiarEstadoProspecto);
   router.post('/prospectos/:id/mensaje', controller.generarMensajeProspecto);
+  router.post('/prospectos/:id/notas', controller.agregarNotaProspecto);
 
   // Campañas con IA
+  router.get('/campanas', controller.listarCampanas);
   router.post('/campanas', controller.generarCampana);
+  router.patch('/campanas/:id/aprobar', controller.aprobarCampana);
 
   return router;
 }
