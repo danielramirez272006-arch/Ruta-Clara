@@ -4,15 +4,21 @@
  */
 
 const FORMATEADORES_MONEDA = {
-  MXN: new Intl.NumberFormat('es-MX', {
+  CRC: new Intl.NumberFormat('es-CR', {
     style: 'currency',
-    currency: 'MXN',
+    currency: 'CRC',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }),
   USD: new Intl.NumberFormat('es-CR', {
     style: 'currency',
     currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }),
+  MXN: new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }),
@@ -24,10 +30,10 @@ const FORMATEADORES_MONEDA = {
   })
 };
 
-export function formatearPresupuesto(importe, moneda = 'MXN') {
+export function formatearPresupuesto(importe, moneda = 'CRC') {
   const num = Number(importe);
   if (!Number.isFinite(num)) return `0,00 ${moneda}`;
-  const codigo = String(moneda || 'MXN').toUpperCase();
+  const codigo = String(moneda || 'CRC').toUpperCase();
   const fmt = FORMATEADORES_MONEDA[codigo];
   if (fmt) {
     return `${fmt.format(num)} ${codigo}`;
@@ -86,7 +92,11 @@ export const SEDES_LISTA = [
 ];
 
 export const CANALES_LISTA = ['Instagram', 'Referido', 'Web', 'WhatsApp'];
-export const MONEDAS_LISTA = ['MXN', 'USD', 'EUR'];
+export const MONEDAS_LISTA = ['CRC', 'USD'];
+export const ETIQUETAS_MONEDA = {
+  CRC: 'CRC — Colón costarricense (₡)',
+  USD: 'USD — Dólar estadounidense ($)'
+};
 
 export const MOTIVOS_PERDIDA_LISTA = [
   { id: 1, nombre: 'Precio' },
