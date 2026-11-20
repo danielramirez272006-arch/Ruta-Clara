@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Settings,
   Database,
@@ -8,7 +8,8 @@ import {
   ShieldCheck,
   Terminal,
   CheckCircle2,
-  XCircle
+  XCircle,
+  RotateCcw
 } from 'lucide-react';
 import {
   BrandRouteDivider,
@@ -20,8 +21,10 @@ export function ConfiguracionView({
   estadoHealth,
   cargandoHealth,
   onVerificarHealth,
-  onExportarJSON
+  onExportarJSON,
+  onRestaurarSemilla
 }) {
+  const [confirmarRestauracion, setConfirmarRestauracion] = useState(false);
   const {
     cargando: exportando,
     error: errorExport,
@@ -207,12 +210,12 @@ export function ConfiguracionView({
         </article>
       </div>
 
-      {/* Exportación de datos ficticios a JSON */}
-      <section
-        aria-labelledby="titulo-exportar-json"
-        className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Exportación de datos ficticios a JSON y Restauración de Semilla Académica */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <section
+          aria-labelledby="titulo-exportar-json"
+          className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm flex flex-col justify-between"
+        >
           <div>
             <h2 id="titulo-exportar-json" className="font-editorial text-lg font-bold text-tinta">
               Exportación de datos ficticios a JSON
@@ -221,17 +224,73 @@ export function ConfiguracionView({
               Descargue un respaldo completo con los catálogos, clientes ficticios, las oportunidades de viaje, su historial de etapas y eventos comerciales.
             </p>
           </div>
-          <button
-            type="button"
-            disabled={exportando}
-            onClick={handleDescargarJSON}
-            className="inline-flex items-center gap-2 rounded-xl bg-turquesa px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" aria-hidden="true" />
-            <span>{exportando ? 'Generando archivo...' : 'Exportar datos ficticios (.json)'}</span>
-          </button>
-        </div>
-      </section>
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={exportando}
+              onClick={handleDescargarJSON}
+              className="inline-flex items-center gap-2 rounded-xl bg-turquesa px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              <span>{exportando ? 'Generando archivo...' : 'Exportar datos ficticios (.json)'}</span>
+            </button>
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="titulo-restaurar-semilla"
+          className="rounded-2xl border border-coral/50 bg-white p-6 shadow-sm flex flex-col justify-between"
+        >
+          <div>
+            <h2 id="titulo-restaurar-semilla" className="font-editorial text-lg font-bold text-tinta">
+              Restaurar semilla académica original (40 oportunidades)
+            </h2>
+            <p className="mt-1 text-xs text-tinta/75">
+              Ideal para demostraciones en clase: restablece en MySQL las 40 oportunidades con distribución <code>[4, 4, 3, 18, 2, 2, 3, 2, 2]</code> y los valores de control exactos de la etapa 4 (<code>29</code> alcanzaron, <code>11</code> avanzaron, <code>37,93%</code> conversión, <code>13</code> faltantes).
+            </p>
+          </div>
+
+          <div className="mt-4">
+            {!confirmarRestauracion ? (
+              <button
+                type="button"
+                disabled={exportando}
+                onClick={() => setConfirmarRestauracion(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-tinta px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-tinta-suave disabled:opacity-50"
+              >
+                <RotateCcw className="h-4 w-4 text-coral" aria-hidden="true" />
+                <span>Restaurar semilla de 40 registros</span>
+              </button>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-coral/50 bg-coral-claro/60 p-3">
+                <span className="text-xs font-semibold text-tinta">
+                  ¿Confirmar reinicio a las 40 oportunidades base?
+                </span>
+                <button
+                  type="button"
+                  disabled={exportando}
+                  onClick={async () => {
+                    await ejecutar(async () => {
+                      if (onRestaurarSemilla) await onRestaurarSemilla();
+                      setConfirmarRestauracion(false);
+                    }, 'Semilla académica de 40 oportunidades restaurada en MySQL con todos los valores de control.');
+                  }}
+                  className="rounded-lg bg-tinta px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  Sí, restaurar ahora
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmarRestauracion(false)}
+                  className="rounded-lg border border-tinta/20 bg-white px-3 py-1.5 text-xs font-semibold text-tinta"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
 
       {/* Instrucciones para configurar el servidor (sin pedir secretos en la UI) */}
       <section
