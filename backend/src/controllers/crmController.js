@@ -277,4 +277,13 @@ export class CrmController {
       next(err);
     }
   };
+
+  restaurarSemilla = async (_req, res, next) => {
+    try {
+      const resultado = await this.crmService.restaurarSemillaAcademica();
+      res.status(200).json({ ok: true, data: resultado });
+    } catch (err) {
+      next(err);
+    }
+  };
 }
