@@ -6,7 +6,8 @@ import {
   validarPreferenciasViaje,
   validarCambioEstadoComercial,
   validarUmbralDias,
-  validarCampanaPayload
+  validarCampanaPayload,
+  validarNotaOportunidadPayload
 } from '../validators/schemas.js';
 
 export class CrmController {
@@ -220,8 +221,39 @@ export class CrmController {
   generarMensajeProspecto = async (req, res, next) => {
     try {
       const id = validarIdNumerico(req.params.id, 'id');
-      const resultado = await this.crmService.generarMensajeIA(id);
+      const tono = typeof req.body?.tono === 'string' ? req.body.tono : 'cálido y consultivo';
+      const resultado = await this.crmService.generarMensajeIA(id, { tono });
       res.status(200).json({ ok: true, data: resultado });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  agregarNotaProspecto = async (req, res, next) => {
+    try {
+      const id = validarIdNumerico(req.params.id, 'id');
+      const notaPayload = validarNotaOportunidadPayload(req.body);
+      const fichaActualizada = await this.crmService.agregarNotaOportunidad(id, notaPayload);
+      res.status(201).json({ ok: true, data: fichaActualizada });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listarCampanas = async (_req, res, next) => {
+    try {
+      const lista = await this.crmService.listarCampanasGuardadas();
+      res.status(200).json({ ok: true, data: lista });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  aprobarCampana = async (req, res, next) => {
+    try {
+      const id = validarIdNumerico(req.params.id, 'id');
+      const lista = await this.crmService.aprobarCampanaGuardada(id);
+      res.status(200).json({ ok: true, data: lista });
     } catch (err) {
       next(err);
     }
