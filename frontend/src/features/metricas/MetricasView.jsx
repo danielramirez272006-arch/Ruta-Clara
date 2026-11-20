@@ -18,7 +18,13 @@ import {
   formatearPuntosPorcentuales
 } from '../../utils/formatters.js';
 
-export function MetricasView({ metricas, cargando, error, onRecargar }) {
+export function MetricasView({
+  metricas,
+  cargando,
+  error,
+  onRecargar,
+  onFiltrarOportunidadesPorEtapa
+}) {
   if (cargando && !metricas) {
     return <LoadingState mensaje="Calculando métricas históricas y brechas del embudo..." />;
   }
@@ -202,7 +208,14 @@ export function MetricasView({ metricas, cargando, error, onRecargar }) {
                     className={esMayorBrecha ? 'bg-coral-claro/65 font-medium' : 'hover:bg-marfil/60'}
                   >
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onFiltrarOportunidadesPorEtapa && onFiltrarOportunidadesPorEtapa(et.etapa_id)
+                        }
+                        className="flex items-center gap-2 text-left hover:underline"
+                        title={`Filtrar tablero por la etapa "${et.nombre}"`}
+                      >
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-tinta text-[11px] font-bold text-white">
                           {et.orden}
                         </span>
@@ -216,7 +229,7 @@ export function MetricasView({ metricas, cargando, error, onRecargar }) {
                             <p className="text-[11px] text-tinta/60">Fin del recorrido</p>
                           )}
                         </div>
-                      </div>
+                      </button>
                     </td>
                     <td className="px-3 py-3 text-right font-bold text-tinta">{et.actuales}</td>
                     <td className="px-3 py-3 text-right text-tinta/75">
