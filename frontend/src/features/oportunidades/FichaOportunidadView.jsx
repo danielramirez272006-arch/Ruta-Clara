@@ -13,7 +13,11 @@ import {
   Check,
   Clock,
   ShieldAlert,
-  History
+  History,
+  MessageSquarePlus,
+  Phone,
+  Mail,
+  CheckCircle2
 } from 'lucide-react';
 import {
   BrandRouteDivider,
@@ -43,7 +47,8 @@ export function FichaOportunidadView({
   onEditarPreferencias,
   onAvanzarEtapa,
   onCambiarEstadoComercial,
-  onGenerarMensajeIA
+  onGenerarMensajeIA,
+  onAgregarNota
 }) {
   const [editandoPreferencias, setEditandoPreferencias] = useState(false);
   const [mostrarConfirmacionAvance, setMostrarConfirmacionAvance] = useState(false);
@@ -60,8 +65,15 @@ export function FichaOportunidadView({
     canal: 'WhatsApp'
   });
 
+  // Selector de tono y edición manual del borrador de IA antes de aprobar/copiar
+  const [tonoIA, setTonoIA] = useState('cálido y consultivo');
   const [resultadoIA, setResultadoIA] = useState(null);
+  const [mensajeEditableIA, setMensajeEditableIA] = useState('');
+  const [aprobadoPorAgente, setAprobadoPorAgente] = useState(false);
   const [copiado, setCopiado] = useState(false);
+
+  // Bitácora de notas del agente
+  const [textoNota, setTextoNota] = useState('');
 
   const {
     cargando: procesando,
@@ -110,6 +122,11 @@ export function FichaOportunidadView({
     puede_registrar_perdida: ficha.estado_comercial !== 'perdida' && Number(ficha.etapa_orden) < 9,
     puede_reabrir: ficha.estado_comercial === 'perdida'
   };
+
+  const presupuestoPorViajero =
+    Number(ficha.viajeros) > 0
+      ? Number(ficha.presupuesto_total) / Number(ficha.viajeros)
+      : Number(ficha.presupuesto_total);
 
   const handleGuardarPreferencias = async (e) => {
     e.preventDefault();
@@ -176,8 +193,10 @@ export function FichaOportunidadView({
   const handleGenerarMensaje = async () => {
     try {
       await ejecutarIA(async () => {
-        const res = await onGenerarMensajeIA(ficha.id);
+        const res = await onGenerarMensajeIA(ficha.id, tonoIA);
         setResultadoIA(res);
+        setMensajeEditableIA(res.mensaje || '');
+        setAprobadoPorAgente(false);
       });
     } catch {
       // Error manejado por errorIA
@@ -185,9 +204,10 @@ export function FichaOportunidadView({
   };
 
   const handleCopiarMensaje = async () => {
-    if (!resultadoIA?.mensaje) return;
+    const textoFinal = mensajeEditableIA || resultadoIA?.mensaje;
+    if (!textoFinal) return;
     try {
-      await navigator.clipboard.writeText(resultadoIA.mensaje);
+      await navigator.clipboard.writeText(textoFinal);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2500);
     } catch {
@@ -195,9 +215,29 @@ export function FichaOportunidadView({
     }
   };
 
+  const handleAgregarNotaSubmit = async (e) => {
+    e.preventDefault();
+    if (!onAgregarNota) return;
+    try {
+      await ejecutar(async () => {
+        await onAgregarNota(ficha.id, {
+          texto: textoNota,
+          autor: 'Asesor Ruta Clara'
+        });
+        setTextoNota('');
+      }, 'Nota comercial guardada en la bitácora de la oportunidad.');
+    } catch {
+      // Conserva textoNota si falla
+    }
+  };
+
+  const palabrasEditables = mensajeEditableIA
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
   return (
     <div className="space-y-6">
-      {/* Barra superior de regreso y encabezado */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
@@ -236,7 +276,6 @@ export function FichaOportunidadView({
         />
       ) : null}
 
-      {/* Aviso de bloqueo si la oportunidad está perdida */}
       {ficha.estado_comercial === 'perdida' ? (
         <BloqueoPerdidaNotice
           motivo={ficha.motivo_perdida_nombre}
@@ -245,7 +284,6 @@ export function FichaOportunidadView({
         />
       ) : null}
 
-      {/* Encabezado principal de la ficha */}
       <header className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -255,14 +293,26 @@ export function FichaOportunidadView({
             <h1 className="mt-1 font-editorial text-2xl font-bold text-tinta sm:text-3xl">
               {ficha.destino} — {ficha.cliente_nombre}
             </h1>
-            <p className="mt-1 text-xs text-tinta/70">
-              Creada: {formatearFechaHoraUTC(ficha.creado_en)} · Último avance de etapa:{' '}
-              <strong>{formatearFechaHoraUTC(ficha.ultimo_avance_en)}</strong> ({ficha.dias_sin_avance}{' '}
-              días en la etapa actual) · Última edición: {formatearFechaHoraUTC(ficha.editado_en)}
-            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-tinta/75">
+              {ficha.cliente_telefono ? (
+                <span className="inline-flex items-center gap-1 rounded bg-marfil px-2 py-0.5 font-medium">
+                  <Phone className="h-3 w-3 text-turquesa" aria-hidden="true" />
+                  <span>{ficha.cliente_telefono}</span>
+                </span>
+              ) : null}
+              {ficha.cliente_correo ? (
+                <span className="inline-flex items-center gap-1 rounded bg-marfil px-2 py-0.5 font-medium">
+                  <Mail className="h-3 w-3 text-coral" aria-hidden="true" />
+                  <span>{ficha.cliente_correo}</span>
+                </span>
+              ) : null}
+              <span>
+                Último avance: <strong>{formatearFechaHoraUTC(ficha.ultimo_avance_en)}</strong> (
+                {ficha.dias_sin_avance} d en etapa)
+              </span>
+            </div>
           </div>
 
-          {/* Botones de acciones de ciclo de vida */}
           <div className="flex flex-wrap items-center gap-2">
             {permisos.puede_avanzar && ficha.siguiente_etapa ? (
               <button
@@ -322,12 +372,33 @@ export function FichaOportunidadView({
           </div>
         </div>
 
-        <BrandRouteDivider
-          className="mt-5"
-          label={`Etapa ${ficha.etapa_orden} de 9 · ${ficha.etapa_nombre}`}
-        />
+        {/* Barra visual de progreso de las 9 etapas */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-tinta/70">
+            <span>Progreso del recorrido: Etapa {ficha.etapa_orden} de 9</span>
+            <span>{ficha.etapa_nombre}</span>
+          </div>
+          <div className="mt-1.5 grid grid-cols-9 gap-1.5">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((paso) => {
+              const alcanzado = paso <= Number(ficha.etapa_orden);
+              const esActual = paso === Number(ficha.etapa_orden);
+              return (
+                <div
+                  key={paso}
+                  className={`h-2 rounded-full transition-all ${
+                    esActual
+                      ? 'bg-coral ring-2 ring-coral/40'
+                      : alcanzado
+                      ? 'bg-turquesa'
+                      : 'bg-marfil-oscuro'
+                  }`}
+                  title={`Etapa ${paso}`}
+                />
+              );
+            })}
+          </div>
+        </div>
 
-        {/* Siguiente acción recomendada */}
         <div className="mt-4 rounded-xl border border-turquesa/30 bg-turquesa-claro/45 p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-turquesa">
             Siguiente acción recomendada para el agente
@@ -336,7 +407,6 @@ export function FichaOportunidadView({
         </div>
       </header>
 
-      {/* Diálogo obligatorio de confirmación antes de avanzar etapa */}
       {mostrarConfirmacionAvance && ficha.siguiente_etapa ? (
         <section
           role="dialog"
@@ -388,7 +458,6 @@ export function FichaOportunidadView({
         </section>
       ) : null}
 
-      {/* Formulario para registrar pérdida con motivo */}
       {mostrarModalPerdida ? (
         <section
           role="dialog"
@@ -439,10 +508,9 @@ export function FichaOportunidadView({
         </section>
       ) : null}
 
-      {/* Cuerpo en dos columnas: Preferencias + IA a la izquierda, Historial cronológico a la derecha */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-7">
-          {/* Tarjeta de Preferencias del viaje */}
+          {/* Preferencias del viaje + cálculo por viajero */}
           <section
             aria-labelledby="titulo-preferencias-viaje"
             className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm"
@@ -606,10 +674,13 @@ export function FichaOportunidadView({
 
                 <div className="rounded-xl border border-tinta/10 bg-marfil/60 p-3.5">
                   <dt className="text-xs font-semibold text-tinta/65">
-                    Presupuesto y moneda (declarado)
+                    Presupuesto total (declarado)
                   </dt>
                   <dd className="mt-1 font-editorial text-lg font-bold text-tinta">
                     {formatearPresupuesto(ficha.presupuesto_total, ficha.moneda)}
+                  </dd>
+                  <dd className="mt-0.5 text-[11px] text-turquesa font-medium">
+                    ≈ {formatearPresupuesto(presupuestoPorViajero, ficha.moneda)} por viajero
                   </dd>
                 </div>
 
@@ -653,7 +724,7 @@ export function FichaOportunidadView({
             )}
           </section>
 
-          {/* Tarjeta de Redacción de mensaje con IA (Claude desde Express) */}
+          {/* Redacción con IA (DeepSeek) con selector de tono y edición previa a aprobación */}
           <section
             aria-labelledby="titulo-mensaje-ia"
             className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm"
@@ -668,19 +739,38 @@ export function FichaOportunidadView({
                   Preparar mensaje de seguimiento con IA
                 </h2>
                 <p className="mt-0.5 text-xs text-tinta/70">
-                  Express envía a DeepSeek únicamente: etapa, sede, siguiente acción, destino, presupuesto/moneda, número de viajeros y fecha preferida. <strong>No se envían nombres ni contactos</strong>. Máximo 100 palabras.
+                  Express envía únicamente: etapa, sede, siguiente acción, destino, presupuesto/moneda, número de viajeros y fecha preferida. <strong>No se envían nombres ni contactos</strong>. Máximo 100 palabras.
                 </p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <div className="min-w-[200px] flex-1">
+                <label htmlFor="select-tono-ia" className="block text-xs font-semibold text-tinta">
+                  Estilo / tono del borrador
+                </label>
+                <select
+                  id="select-tono-ia"
+                  disabled={!permisos.puede_generar_mensaje_ia || generandoIA}
+                  value={tonoIA}
+                  onChange={(e) => setTonoIA(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-tinta/25 bg-marfil/60 px-3 py-2 text-xs font-medium text-tinta"
+                >
+                  <option value="cálido y consultivo">Cálido y consultivo (Boutique)</option>
+                  <option value="ejecutivo y directo">Ejecutivo y directo</option>
+                  <option value="breve de recordatorio amable">Breve de recordatorio amable</option>
+                </select>
               </div>
 
               <button
                 type="button"
                 disabled={!permisos.puede_generar_mensaje_ia || generandoIA}
                 onClick={handleGenerarMensaje}
-                className="inline-flex items-center gap-2 rounded-xl bg-turquesa px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-45"
+                className="inline-flex items-center gap-2 rounded-xl bg-turquesa px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-45"
               >
                 <Sparkles className="h-4 w-4" aria-hidden="true" />
                 <span>
-                  {generandoIA ? 'Solicitando a Claude...' : 'Preparar mensaje con IA'}
+                  {generandoIA ? 'Solicitando a DeepSeek...' : 'Preparar mensaje con IA'}
                 </span>
               </button>
             </div>
@@ -689,7 +779,7 @@ export function FichaOportunidadView({
               <div className="mt-4">
                 <AlertBanner
                   tipo="aviso"
-                  titulo="Aviso del servicio de IA (Claude en Express)"
+                  titulo="Aviso del servicio de IA (Express)"
                   mensaje={errorIA}
                   onClose={limpiarErrorIA}
                 />
@@ -699,40 +789,140 @@ export function FichaOportunidadView({
             {resultadoIA ? (
               <div className="mt-4 space-y-3 rounded-xl border border-turquesa/35 bg-marfil/70 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-800/35 bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-950">
-                    <span>Estado: {resultadoIA.estado_aprobacion}</span>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-bold ${
+                      aprobadoPorAgente
+                        ? 'border-emerald-800/35 bg-emerald-100 text-emerald-950'
+                        : 'border-amber-800/35 bg-amber-100 text-amber-950'
+                    }`}
+                  >
+                    {aprobadoPorAgente ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700" aria-hidden="true" />
+                        <span>Revisado y aprobado por el agente</span>
+                      </>
+                    ) : (
+                      <span>Estado: {resultadoIA.estado_aprobacion}</span>
+                    )}
                   </span>
                   <span className="text-xs text-tinta/70">
-                    {resultadoIA.palabras} / 100 palabras · Modelo: {resultadoIA.modelo}
+                    {palabrasEditables} / 100 palabras · {resultadoIA.proveedor || 'DeepSeek'} ({resultadoIA.modelo})
                   </span>
                 </div>
 
-                <p className="whitespace-pre-line rounded-xl border border-tinta/15 bg-white p-3.5 text-sm leading-relaxed text-tinta">
-                  {resultadoIA.mensaje}
-                </p>
+                <div>
+                  <label htmlFor="textarea-borrador-ia" className="block text-[11px] font-semibold text-tinta/75">
+                    Puede ajustar el borrador antes de aprobarlo y copiarlo:
+                  </label>
+                  <textarea
+                    id="textarea-borrador-ia"
+                    rows={4}
+                    value={mensajeEditableIA}
+                    onChange={(e) => {
+                      setMensajeEditableIA(e.target.value);
+                      setAprobadoPorAgente(false);
+                    }}
+                    className="mt-1 w-full rounded-xl border border-tinta/20 bg-white p-3 text-sm leading-relaxed text-tinta focus:border-turquesa"
+                  />
+                </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-[11px] text-tinta/70">{resultadoIA.aviso}</p>
-                  <button
-                    type="button"
-                    onClick={handleCopiarMensaje}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-tinta px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-suave"
-                  >
-                    {copiado ? (
-                      <>
-                        <Check className="h-3.5 w-3.5 text-emerald-400" aria-hidden="true" />
-                        <span>Copiado al portapapeles</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>Copiar borrador</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAprobadoPorAgente((prev) => !prev)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                        aprobadoPorAgente
+                          ? 'border border-tinta/20 bg-white text-tinta'
+                          : 'bg-emerald-800 text-white hover:bg-emerald-900'
+                      }`}
+                    >
+                      {aprobadoPorAgente ? 'Marcar como pendiente' : 'Aprobar borrador'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCopiarMensaje}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-tinta px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-suave"
+                    >
+                      {copiado ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-400" aria-hidden="true" />
+                          <span>Copiado</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Copiar texto</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}
+          </section>
+
+          {/* Bitácora de Notas del Agente */}
+          <section
+            aria-labelledby="titulo-bitacora-notas"
+            className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm"
+          >
+            <div className="flex items-center gap-2">
+              <MessageSquarePlus className="h-5 w-5 text-turquesa" aria-hidden="true" />
+              <h2 id="titulo-bitacora-notas" className="font-editorial text-lg font-bold text-tinta">
+                Bitácora de notas y observaciones del asesor
+              </h2>
+            </div>
+            <p className="mt-0.5 text-xs text-tinta/70">
+              Registre acuerdos, preferencias de hospedaje u horarios de llamada. Agregar una nota no modifica la etapa ni reinicia la antigüedad del último avance.
+            </p>
+
+            <form onSubmit={handleAgregarNotaSubmit} className="mt-3 flex flex-wrap gap-2">
+              <label htmlFor="input-nueva-nota" className="sr-only">
+                Escribir nota comercial
+              </label>
+              <input
+                id="input-nueva-nota"
+                type="text"
+                required
+                minLength={2}
+                maxLength={600}
+                value={textoNota}
+                onChange={(e) => setTextoNota(e.target.value)}
+                placeholder="Ej. Prefiere vuelos directos y hotel céntrico con desayuno..."
+                className="flex-1 min-w-[220px] rounded-xl border border-tinta/25 bg-marfil/60 px-3.5 py-2 text-xs text-tinta focus:border-turquesa focus:bg-white"
+              />
+              <button
+                type="submit"
+                disabled={procesando}
+                className="rounded-xl bg-tinta px-4 py-2 text-xs font-semibold text-white hover:bg-tinta-suave disabled:opacity-50"
+              >
+                Guardar nota
+              </button>
+            </form>
+
+            <div className="mt-4 space-y-2.5">
+              {(ficha.notas_agente || []).length === 0 ? (
+                <p className="rounded-xl border border-dashed border-tinta/15 bg-marfil/40 p-3 text-xs text-tinta/65">
+                  No hay notas registradas aún en esta oportunidad.
+                </p>
+              ) : (
+                (ficha.notas_agente || []).map((nota) => (
+                  <article
+                    key={nota.id}
+                    className="rounded-xl border border-tinta/10 bg-marfil/60 p-3 text-xs"
+                  >
+                    <div className="flex items-center justify-between text-[11px] text-tinta/65">
+                      <span className="font-bold text-turquesa">{nota.autor}</span>
+                      <span>{formatearFechaHoraUTC(nota.fecha)}</span>
+                    </div>
+                    <p className="mt-1 text-tinta leading-relaxed">{nota.texto}</p>
+                  </article>
+                ))
+              )}
+            </div>
           </section>
         </div>
 
