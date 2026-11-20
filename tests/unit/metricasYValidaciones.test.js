@@ -104,7 +104,7 @@ test('4. Validaciones rechazan presupuestos negativos o cero, fechas inválidas,
       validarPreferenciasViaje({
         destino: 'Cancún',
         presupuesto_total: -500,
-        moneda: 'MXN',
+        moneda: 'CRC',
         viajeros: 2,
         fecha_salida: '2027-03-10',
         sede_id: 1,
@@ -119,7 +119,7 @@ test('4. Validaciones rechazan presupuestos negativos o cero, fechas inválidas,
       validarPreferenciasViaje({
         destino: 'Cancún',
         presupuesto_total: 0,
-        moneda: 'MXN',
+        moneda: 'CRC',
         viajeros: 2,
         fecha_salida: '2027-03-10',
         sede_id: 1,
@@ -133,8 +133,8 @@ test('4. Validaciones rechazan presupuestos negativos o cero, fechas inválidas,
     () =>
       validarPreferenciasViaje({
         destino: 'Madrid',
-        presupuesto_total: 45000,
-        moneda: 'EUR',
+        presupuesto_total: 4500,
+        moneda: 'USD',
         viajeros: 2,
         fecha_salida: '2027-02-30',
         sede_id: 1,
@@ -203,8 +203,8 @@ test('4. Validaciones rechazan presupuestos negativos o cero, fechas inválidas,
     () =>
       validarCrearOportunidad({
         destino: 'Oaxaca',
-        presupuesto_total: 25000,
-        moneda: 'MXN',
+        presupuesto_total: 1250000,
+        moneda: 'CRC',
         viajeros: 2,
         fecha_salida: '2027-05-15',
         sede_id: 1,
@@ -261,8 +261,8 @@ test('6. Privacidad y manejo de errores de IA (DeepSeek): el prompt excluye nomb
     sede: 'Desamparados',
     siguiente_accion: 'Resolver dudas sobre itinerario.',
     destino: 'Oaxaca',
-    presupuesto_total: 46800,
-    moneda: 'MXN',
+    presupuesto_total: 1250000,
+    moneda: 'CRC',
     viajeros: 2,
     fecha_salida: '2027-03-18',
     cliente_nombre: 'NOMBRE_SECRETO_NO_ENVIAR',
@@ -272,7 +272,7 @@ test('6. Privacidad y manejo de errores de IA (DeepSeek): el prompt excluye nomb
   assert.ok(prompt.includes('Seguimiento de cotización'));
   assert.ok(prompt.includes('Desamparados'));
   assert.ok(prompt.includes('Oaxaca'));
-  assert.ok(prompt.includes('46800.00 MXN'));
+  assert.ok(prompt.includes('1250000.00 CRC'));
   assert.ok(!prompt.includes('NOMBRE_SECRETO_NO_ENVIAR'), 'El prompt nunca debe incluir el nombre del cliente');
   assert.ok(!prompt.includes('8888-8888'), 'El prompt nunca debe incluir teléfonos o contactos');
 
@@ -290,8 +290,8 @@ test('6. Privacidad y manejo de errores de IA (DeepSeek): el prompt excluye nomb
           sede_nombre: 'Puntarenas',
           siguiente_accion: 'Confirmar recepción.',
           destino: 'Cancún',
-          presupuesto_total: 35000,
-          moneda: 'MXN',
+          presupuesto_total: 2400,
+          moneda: 'USD',
           viajeros: 2,
           fecha_salida: '2027-04-10'
         }),
@@ -318,8 +318,8 @@ test('6. Privacidad y manejo de errores de IA (DeepSeek): el prompt excluye nomb
           sede_nombre: 'Puntarenas',
           siguiente_accion: 'Confirmar recepción.',
           destino: 'Cancún',
-          presupuesto_total: 35000,
-          moneda: 'MXN',
+          presupuesto_total: 2400,
+          moneda: 'USD',
           viajeros: 2,
           fecha_salida: '2027-04-10'
         }),

@@ -1,6 +1,6 @@
 import { AppError } from '../middleware/errorHandler.js';
 
-export const MONEDAS_VALIDAS = ['CRC', 'USD', 'MXN', 'EUR'];
+export const MONEDAS_VALIDAS = ['CRC', 'USD'];
 export const CANALES_VALIDOS = ['Instagram', 'Referido', 'Web', 'WhatsApp'];
 export const ESTADOS_COMERCIALES_VALIDOS = ['abierta', 'perdida', 'cerrada'];
 

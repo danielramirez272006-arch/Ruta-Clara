@@ -15,18 +15,6 @@ const FORMATEADORES_MONEDA = {
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }),
-  MXN: new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }),
-  EUR: new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
   })
 };
 

@@ -80,7 +80,7 @@ CREATE TABLE oportunidades (
   CONSTRAINT fk_oportunidades_etapa FOREIGN KEY (etapa_id) REFERENCES etapas(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT fk_oportunidades_motivo FOREIGN KEY (motivo_perdida_id) REFERENCES motivos_perdida(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT chk_oportunidades_presupuesto CHECK (presupuesto_total > 0),
-  CONSTRAINT chk_oportunidades_moneda CHECK (moneda IN ('CRC', 'USD', 'MXN', 'EUR')),
+  CONSTRAINT chk_oportunidades_moneda CHECK (moneda IN ('CRC', 'USD')),
   CONSTRAINT chk_oportunidades_viajeros CHECK (viajeros BETWEEN 1 AND 50),
   CONSTRAINT chk_oportunidades_canal CHECK (canal IN ('Instagram', 'Referido', 'Web', 'WhatsApp')),
   CONSTRAINT chk_oportunidades_estado CHECK (estado_comercial IN ('abierta', 'perdida', 'cerrada')),

@@ -407,8 +407,8 @@ test('Flujo completo de Criterios de Aceptación sobre la API REST de Ruta Clara
       cliente_id: nuevoClienteId,
       sede_id: 1,
       destino: 'Oaxaca',
-      presupuesto_total: 42000,
-      moneda: 'MXN',
+      presupuesto_total: 1250000,
+      moneda: 'CRC',
       viajeros: 2,
       fecha_salida: '2027-04-10',
       canal: 'WhatsApp'
@@ -423,8 +423,8 @@ test('Flujo completo de Criterios de Aceptación sobre la API REST de Ruta Clara
       cliente_id: nuevoClienteId,
       sede_id: 2,
       destino: 'Madrid',
-      presupuesto_total: 6800,
-      moneda: 'EUR',
+      presupuesto_total: 4200,
+      moneda: 'USD',
       viajeros: 3,
       fecha_salida: '2027-09-20',
       canal: 'Web'

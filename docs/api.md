@@ -5,7 +5,7 @@ La API REST de **Ruta Clara** está construida con **Node.js**, **Express** (mó
 - **URL Base local**: `http://localhost:3001` (también accesible con prefijo `/api`, p. ej. `http://localhost:3001/api/embudo`).
 - **Formato de intercambio**: `application/json; charset=utf-8`.
 - **Fechas**: Almacenadas y devueltas en UTC (`YYYY-MM-DD HH:MM:SS` o ISO 8601).
-- **Monedas soportadas**: **Colón costarricense (`CRC`)** y **Dólar estadounidense (`USD`)** (con compatibilidad histórica para `MXN` y `EUR`). Nunca se suman monedas diferentes entre sí.
+- **Monedas soportadas**: **Colón costarricense (`CRC`)** y **Dólar estadounidense (`USD`)**. Nunca se suman monedas diferentes entre sí.
 - **Terminología**: En las rutas heredadas del taller, el recurso `/prospectos` representa una **oportunidad de viaje**; `/clientes` representa a la entidad independiente del viajero.
 
 ---
@@ -89,7 +89,7 @@ Crea una oportunidad en la etapa 1 (`Consulta recibida`) y registra su entrada i
 ```
 - **Validaciones**:
   - `presupuesto_total` > 0 (`VALIDACION_PRESUPUESTO_INVALIDO`).
-  - `moneda` en `['CRC', 'USD', 'MXN', 'EUR']` (`VALIDACION_MONEDA_INVALIDA`).
+  - `moneda` en `['CRC', 'USD']` (`VALIDACION_MONEDA_INVALIDA`).
   - `viajeros` entero entre `1` y `50` (`VALIDACION_VIAJEROS_FUERA_RANGO`).
   - `fecha_salida` calendario real `YYYY-MM-DD` (`VALIDACION_FECHA_INVALIDA`).
   - `canal` en `['Instagram', 'Referido', 'Web', 'WhatsApp']` (`VALIDACION_CANAL_INVALIDO`).

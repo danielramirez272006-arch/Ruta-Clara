@@ -146,7 +146,7 @@ export function FichaOportunidadView({
       setFormPref({
         destino: ficha.destino || '',
         presupuesto_total: String(ficha.presupuesto_total ?? ''),
-        moneda: ficha.moneda || 'MXN',
+        moneda: ficha.moneda || 'CRC',
         viajeros: String(ficha.viajeros ?? 1),
         fecha_salida: String(ficha.fecha_salida || '').slice(0, 10),
         sede_id: String(ficha.sede_id || 1),
