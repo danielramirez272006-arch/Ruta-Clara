@@ -6,7 +6,10 @@ import {
   Edit3,
   PlusCircle,
   ArrowRight,
-  Plane
+  Plane,
+  Phone,
+  Mail,
+  MessageSquare
 } from 'lucide-react';
 import {
   BrandRouteDivider,
@@ -31,8 +34,17 @@ export function ClientesView({
 }) {
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [nombreNuevo, setNombreNuevo] = useState('');
+  const [telefonoNuevo, setTelefonoNuevo] = useState('');
+  const [correoNuevo, setCorreoNuevo] = useState('');
+  const [preferenciaNueva, setPreferenciaNueva] = useState('WhatsApp');
+
   const [clienteEditandoId, setClienteEditandoId] = useState(null);
-  const [nombreEditado, setNombreEditado] = useState('');
+  const [formEdit, setFormEdit] = useState({
+    nombre: '',
+    telefono: '',
+    correo: '',
+    preferencia_contacto: 'WhatsApp'
+  });
 
   const {
     cargando: guardando,
@@ -58,20 +70,29 @@ export function ClientesView({
       await ejecutar(async () => {
         await onCrearCliente({
           nombre: nombreNuevo,
+          telefono: telefonoNuevo,
+          correo: correoNuevo,
+          preferencia_contacto: preferenciaNueva,
           es_ficticio: true
         });
-        // Solo limpiamos el campo si la solicitud tuvo éxito (conservamos datos si falla)
         setNombreNuevo('');
-      }, 'Cliente ficticio registrado correctamente.');
+        setTelefonoNuevo('');
+        setCorreoNuevo('');
+      }, 'Cliente ficticio registrado correctamente con sus datos de contacto.');
     } catch {
-      // El hook conserva el error y el formulario mantiene nombreNuevo
+      // Conserva datos en formulario si ocurre error
     }
   };
 
   const iniciarEdicion = (cliente) => {
     limpiarMensajes();
     setClienteEditandoId(cliente.id);
-    setNombreEditado(cliente.nombre);
+    setFormEdit({
+      nombre: cliente.nombre || '',
+      telefono: cliente.telefono || '',
+      correo: cliente.correo || '',
+      preferencia_contacto: cliente.preferencia_contacto || 'WhatsApp'
+    });
   };
 
   const handleGuardarEdicion = async (e, clienteId) => {
@@ -79,13 +100,13 @@ export function ClientesView({
     try {
       await ejecutar(async () => {
         await onActualizarCliente(clienteId, {
-          nombre: nombreEditado,
+          ...formEdit,
           es_ficticio: true
         });
         setClienteEditandoId(null);
       }, 'Datos del cliente actualizados correctamente.');
     } catch {
-      // Conserva nombreEditado en caso de fallo
+      // Conserva edición en caso de fallo
     }
   };
 
@@ -102,10 +123,10 @@ export function ClientesView({
               <DatoFicticioBadge />
             </div>
             <h1 className="mt-2 font-editorial text-2xl font-bold text-tinta">
-              Clientes y su historial de oportunidades
+              Clientes, preferencias de contacto y oportunidades
             </h1>
             <p className="mt-1 text-sm text-tinta/75">
-              Cada cliente es una entidad independiente y puede contar con múltiples oportunidades de viaje simultáneas o históricas.
+              Cada cliente puede tener múltiples oportunidades de viaje independientes. Nota de privacidad: los teléfonos y correos ficticios son para uso exclusivo del asesor y <strong>nunca se envían a DeepSeek</strong>.
             </p>
           </div>
         </div>
@@ -130,25 +151,21 @@ export function ClientesView({
         />
       ) : null}
 
-      {/* Panel de búsqueda y creación de cliente ficticio */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <section
           aria-labelledby="form-crear-cliente-titulo"
-          className="rounded-2xl border border-tinta/15 bg-white p-5 shadow-sm lg:col-span-5"
+          className="rounded-2xl border border-tinta/15 bg-white p-5 shadow-sm lg:col-span-6"
         >
           <h2 id="form-crear-cliente-titulo" className="font-editorial text-lg font-bold text-tinta">
             Registrar nuevo cliente ficticio
           </h2>
           <p className="mt-0.5 text-xs text-tinta/70">
-            Todos los perfiles creados se etiquetan como datos ficticios académicos.
+            Incluya datos ficticios opcionales de contacto para facilitar el seguimiento manual del asesor.
           </p>
 
-          <form onSubmit={handleCrearClienteSubmit} className="mt-4 space-y-3" noValidate>
-            <div>
-              <label
-                htmlFor="input-nombre-nuevo-cliente"
-                className="block text-xs font-semibold text-tinta"
-              >
+          <form onSubmit={handleCrearClienteSubmit} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2" noValidate>
+            <div className="sm:col-span-2">
+              <label htmlFor="input-nombre-nuevo-cliente" className="block text-xs font-semibold text-tinta">
                 Nombre completo del cliente (ficticio) *
               </label>
               <input
@@ -164,32 +181,79 @@ export function ClientesView({
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={guardando}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-tinta px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-tinta-suave disabled:opacity-50"
-            >
-              <UserPlus className="h-4 w-4" aria-hidden="true" />
-              <span>{guardando ? 'Guardando cliente...' : 'Crear cliente ficticio'}</span>
-            </button>
+            <div>
+              <label htmlFor="input-tel-nuevo-cliente" className="block text-xs font-semibold text-tinta">
+                Teléfono (ficticio opcional)
+              </label>
+              <input
+                id="input-tel-nuevo-cliente"
+                type="text"
+                value={telefonoNuevo}
+                onChange={(e) => setTelefonoNuevo(e.target.value)}
+                placeholder="+506 8000-0000"
+                className="mt-1 w-full rounded-xl border border-tinta/25 bg-marfil/50 px-3 py-2 text-xs text-tinta focus:border-turquesa focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="input-correo-nuevo-cliente" className="block text-xs font-semibold text-tinta">
+                Correo (ficticio opcional)
+              </label>
+              <input
+                id="input-correo-nuevo-cliente"
+                type="email"
+                value={correoNuevo}
+                onChange={(e) => setCorreoNuevo(e.target.value)}
+                placeholder="viajero@rutaclara-demo.cr"
+                className="mt-1 w-full rounded-xl border border-tinta/25 bg-marfil/50 px-3 py-2 text-xs text-tinta focus:border-turquesa focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="select-pref-contacto" className="block text-xs font-semibold text-tinta">
+                Canal preferido de contacto
+              </label>
+              <select
+                id="select-pref-contacto"
+                value={preferenciaNueva}
+                onChange={(e) => setPreferenciaNueva(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-tinta/25 bg-marfil/50 px-3 py-2 text-xs text-tinta focus:border-turquesa focus:bg-white"
+              >
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Correo">Correo electrónico</option>
+                <option value="Llamada">Llamada telefónica</option>
+                <option value="Instagram">Instagram DM</option>
+              </select>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={guardando}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-tinta px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-tinta-suave disabled:opacity-50"
+              >
+                <UserPlus className="h-4 w-4 text-coral" aria-hidden="true" />
+                <span>{guardando ? 'Guardando...' : 'Crear cliente'}</span>
+              </button>
+            </div>
           </form>
         </section>
 
         <section
           aria-labelledby="form-buscar-cliente-titulo"
-          className="rounded-2xl border border-tinta/15 bg-white p-5 shadow-sm lg:col-span-7"
+          className="rounded-2xl border border-tinta/15 bg-white p-5 shadow-sm lg:col-span-6"
         >
           <h2 id="form-buscar-cliente-titulo" className="font-editorial text-lg font-bold text-tinta">
             Buscar y filtrar clientes
           </h2>
           <p className="mt-0.5 text-xs text-tinta/70">
-            Consulte por nombre o revise cuáles viajeros tienen dos o más oportunidades independientes.
+            Busque por nombre, correo o teléfono ficticio, o revise cuáles viajeros tienen múltiples viajes.
           </p>
 
           <form onSubmit={handleBuscarSubmit} className="mt-4 flex flex-wrap gap-2.5">
             <div className="relative flex-1 min-w-[220px]">
               <label htmlFor="input-buscar-cliente" className="sr-only">
-                Buscar cliente por nombre
+                Buscar cliente
               </label>
               <Search
                 className="pointer-events-none absolute left-3.5 top-2.5 h-4 w-4 text-tinta/45"
@@ -200,7 +264,7 @@ export function ClientesView({
                 type="search"
                 value={terminoBusqueda}
                 onChange={(e) => setTerminoBusqueda(e.target.value)}
-                placeholder="Buscar por nombre de viajero..."
+                placeholder="Buscar por nombre, correo o teléfono..."
                 className="w-full rounded-xl border border-tinta/25 bg-marfil/50 pl-10 pr-3.5 py-2 text-sm text-tinta placeholder:text-tinta/45 focus:border-turquesa focus:bg-white"
               />
             </div>
@@ -220,10 +284,22 @@ export function ClientesView({
               </button>
             ) : null}
           </form>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-tinta/10 pt-4 text-xs">
+            <div className="rounded-xl bg-marfil/70 p-3">
+              <span className="text-tinta/70">Total de clientes listados</span>
+              <p className="mt-0.5 font-editorial text-xl font-bold text-tinta">{clientes.length}</p>
+            </div>
+            <div className="rounded-xl bg-marfil/70 p-3">
+              <span className="text-tinta/70">Clientes con 2+ viajes</span>
+              <p className="mt-0.5 font-editorial text-xl font-bold text-turquesa">
+                {clientes.filter((c) => (c.oportunidades || []).length >= 2).length}
+              </p>
+            </div>
+          </div>
         </section>
       </div>
 
-      {/* Lista de clientes con sus oportunidades de viaje */}
       {cargando ? (
         <LoadingState mensaje="Consultando clientes y oportunidades..." />
       ) : clientes.length === 0 ? (
@@ -244,52 +320,39 @@ export function ClientesView({
               >
                 <div>
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-tinta text-xs font-bold text-white">
+                    <div className="flex items-start gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-tinta text-xs font-bold text-white">
                         #{cliente.id}
                       </span>
                       <div>
-                        {estaEditando ? (
-                          <form
-                            onSubmit={(e) => handleGuardarEdicion(e, cliente.id)}
-                            className="flex flex-wrap items-center gap-2"
-                          >
-                            <label htmlFor={`edit-cliente-${cliente.id}`} className="sr-only">
-                              Editar nombre de cliente
-                            </label>
-                            <input
-                              id={`edit-cliente-${cliente.id}`}
-                              type="text"
-                              required
-                              value={nombreEditado}
-                              onChange={(e) => setNombreEditado(e.target.value)}
-                              className="rounded-lg border border-turquesa bg-marfil px-2.5 py-1 text-sm font-semibold text-tinta"
-                            />
-                            <button
-                              type="submit"
-                              disabled={guardando}
-                              className="rounded-lg bg-turquesa px-2.5 py-1 text-xs font-semibold text-white"
-                            >
-                              Guardar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setClienteEditandoId(null)}
-                              className="rounded-lg border border-tinta/20 px-2 py-1 text-xs font-semibold text-tinta"
-                            >
-                              Cancelar
-                            </button>
-                          </form>
-                        ) : (
-                          <h3 className="font-editorial text-lg font-bold text-tinta">
-                            {cliente.nombre}
-                          </h3>
-                        )}
-                        <div className="mt-0.5 flex items-center gap-2">
+                        <h3 className="font-editorial text-lg font-bold text-tinta">
+                          {cliente.nombre}
+                        </h3>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2">
                           <DatoFicticioBadge visible={Boolean(cliente.es_ficticio)} />
-                          <span className="text-xs text-tinta/65">
-                            {ops.length} {ops.length === 1 ? 'oportunidad de viaje' : 'oportunidades de viaje'}
+                          <span className="text-xs font-medium text-tinta/65">
+                            {ops.length} {ops.length === 1 ? 'oportunidad' : 'oportunidades'}
                           </span>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-tinta/75">
+                          {cliente.telefono ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Phone className="h-3 w-3 text-turquesa" aria-hidden="true" />
+                              <span>{cliente.telefono}</span>
+                            </span>
+                          ) : null}
+                          {cliente.correo ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Mail className="h-3 w-3 text-coral" aria-hidden="true" />
+                              <span>{cliente.correo}</span>
+                            </span>
+                          ) : null}
+                          {cliente.preferencia_contacto ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-marfil px-1.5 py-0.5 text-[11px] font-semibold text-tinta">
+                              <MessageSquare className="h-3 w-3 text-turquesa" aria-hidden="true" />
+                              <span>Prefiere: {cliente.preferencia_contacto}</span>
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -316,7 +379,83 @@ export function ClientesView({
                     ) : null}
                   </div>
 
-                  {/* Lista de oportunidades independientes de este cliente */}
+                  {estaEditando ? (
+                    <form
+                      onSubmit={(e) => handleGuardarEdicion(e, cliente.id)}
+                      className="mt-3 grid grid-cols-1 gap-2.5 rounded-xl border border-turquesa/40 bg-marfil/70 p-3 sm:grid-cols-2"
+                    >
+                      <div className="sm:col-span-2">
+                        <label htmlFor={`edit-nombre-${cliente.id}`} className="block text-[11px] font-semibold text-tinta">
+                          Nombre *
+                        </label>
+                        <input
+                          id={`edit-nombre-${cliente.id}`}
+                          type="text"
+                          required
+                          value={formEdit.nombre}
+                          onChange={(e) => setFormEdit((p) => ({ ...p, nombre: e.target.value }))}
+                          className="mt-0.5 w-full rounded-lg border border-tinta/25 bg-white px-2.5 py-1.5 text-xs font-semibold text-tinta"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`edit-tel-${cliente.id}`} className="block text-[11px] font-semibold text-tinta">
+                          Teléfono ficticio
+                        </label>
+                        <input
+                          id={`edit-tel-${cliente.id}`}
+                          type="text"
+                          value={formEdit.telefono}
+                          onChange={(e) => setFormEdit((p) => ({ ...p, telefono: e.target.value }))}
+                          className="mt-0.5 w-full rounded-lg border border-tinta/25 bg-white px-2.5 py-1.5 text-xs text-tinta"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`edit-correo-${cliente.id}`} className="block text-[11px] font-semibold text-tinta">
+                          Correo ficticio
+                        </label>
+                        <input
+                          id={`edit-correo-${cliente.id}`}
+                          type="email"
+                          value={formEdit.correo}
+                          onChange={(e) => setFormEdit((p) => ({ ...p, correo: e.target.value }))}
+                          className="mt-0.5 w-full rounded-lg border border-tinta/25 bg-white px-2.5 py-1.5 text-xs text-tinta"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`edit-pref-${cliente.id}`} className="block text-[11px] font-semibold text-tinta">
+                          Canal preferido
+                        </label>
+                        <select
+                          id={`edit-pref-${cliente.id}`}
+                          value={formEdit.preferencia_contacto}
+                          onChange={(e) => setFormEdit((p) => ({ ...p, preferencia_contacto: e.target.value }))}
+                          className="mt-0.5 w-full rounded-lg border border-tinta/25 bg-white px-2.5 py-1.5 text-xs text-tinta"
+                        >
+                          <option value="WhatsApp">WhatsApp</option>
+                          <option value="Correo">Correo electrónico</option>
+                          <option value="Llamada">Llamada telefónica</option>
+                          <option value="Instagram">Instagram DM</option>
+                        </select>
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <button
+                          type="submit"
+                          disabled={guardando}
+                          className="rounded-lg bg-turquesa px-3 py-1.5 text-xs font-semibold text-white"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setClienteEditandoId(null)}
+                          className="rounded-lg border border-tinta/20 bg-white px-3 py-1.5 text-xs font-semibold text-tinta"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+
                   <div className="mt-4 space-y-2.5">
                     {ops.length === 0 ? (
                       <p className="rounded-xl border border-dashed border-tinta/20 bg-marfil/40 p-3 text-xs text-tinta/70">
