@@ -56,3 +56,21 @@
   background: linear-gradient(90deg, #126F7C 0%, #D98164 100%);
   opacity: 0.45;
 }
+
+/* Estilos limpios de impresión / exportación PDF para Ficha de Oportunidad y Reportes de Métricas */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #152D39 !important;
+  }
+
+  aside,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+}
