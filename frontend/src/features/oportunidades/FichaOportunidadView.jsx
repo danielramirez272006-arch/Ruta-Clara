@@ -17,7 +17,9 @@ import {
   MessageSquarePlus,
   Phone,
   Mail,
-  CheckCircle2
+  CheckCircle2,
+  Printer,
+  ListChecks
 } from 'lucide-react';
 import {
   BrandRouteDivider,
@@ -38,6 +40,54 @@ import {
   SEDES_LISTA
 } from '../../utils/formatters.js';
 import { useAsyncAction } from '../../hooks/useAsyncAction.js';
+
+const CHECKLIST_POR_ETAPA = {
+  1: [
+    'Confirmar nombre del viajero y canal de entrada',
+    'Acordar llamada o contacto inicial para levantar preferencias',
+    'Verificar sede de atención asignada (Desamparados o Puntarenas)'
+  ],
+  2: [
+    'Validar destino, presupuesto total declarado y moneda',
+    'Confirmar cantidad exacta de viajeros y edades',
+    'Registrar fecha deseada de salida y flexibilidad'
+  ],
+  3: [
+    'Diseñar itinerario boutique con al menos 2 opciones de hospedaje',
+    'Verificar que el presupuesto esté dentro del rango declarado',
+    'Enviar propuesta formal y registrar acuse de envío'
+  ],
+  4: [
+    'Confirmar que el viajero recibió y abrió la cotización',
+    'Resolver dudas de itinerario, vuelos o categoría de hotel',
+    'Apoyarse en el borrador con IA para destrabar la decisión'
+  ],
+  5: [
+    'Confirmar por escrito la opción de propuesta seleccionada',
+    'Verificar nombres completos de los viajeros según identificación',
+    'Compartir instrucciones claras para recepción del anticipo'
+  ],
+  6: [
+    'Verificar acreditación del anticipo en administración',
+    'Bloquear espacios aéreos y terrestres con operadores',
+    'Preparar vouchers y códigos de confirmación'
+  ],
+  7: [
+    'Entregar confirmación formal de reserva y vouchers al viajero',
+    'Compartir recomendaciones locales del destino y teléfonos de asistencia',
+    'Programar recordatorio previo a la fecha de salida'
+  ],
+  8: [
+    'Monitorear que los traslados y vuelos de ida hayan operado en orden',
+    'Mantener canal de atención disponible durante la estancia',
+    'Preparar contacto de bienvenida al regreso'
+  ],
+  9: [
+    'Conocer nivel de satisfacción del viajero y aprendizajes del itinerario',
+    'Agradecer la confianza y solicitar referidos o testimonio',
+    'Documentar intereses para su próximo viaje'
+  ]
+};
 
 export function FichaOportunidadView({
   ficha,
@@ -72,8 +122,9 @@ export function FichaOportunidadView({
   const [aprobadoPorAgente, setAprobadoPorAgente] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
-  // Bitácora de notas del agente
+  // Bitácora de notas del agente y checklist operativa por etapa
   const [textoNota, setTextoNota] = useState('');
+  const [itemsChecklistMarcados, setItemsChecklistMarcados] = useState({});
 
   const {
     cargando: procesando,
@@ -249,6 +300,14 @@ export function FichaOportunidadView({
         </button>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="no-print inline-flex items-center gap-1.5 rounded-xl border border-tinta/20 bg-white px-3 py-1.5 text-xs font-semibold text-tinta shadow-sm hover:bg-marfil-oscuro"
+          >
+            <Printer className="h-3.5 w-3.5 text-turquesa" aria-hidden="true" />
+            <span>Imprimir / PDF</span>
+          </button>
           <EstadoComercialBadge
             estado={ficha.estado_comercial}
             motivo={ficha.motivo_perdida_nombre}
@@ -926,59 +985,109 @@ export function FichaOportunidadView({
           </section>
         </div>
 
-        {/* Columna derecha: Historial cronológico completo (etapas + pérdidas + reaperturas) */}
-        <section
-          aria-labelledby="titulo-historial-cronologico"
-          className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm lg:col-span-5"
-        >
-          <div className="flex items-center gap-2">
-            <History className="h-5 w-5 text-turquesa" aria-hidden="true" />
-            <h2 id="titulo-historial-cronologico" className="font-editorial text-lg font-bold text-tinta">
-              Historial cronológico (UTC)
-            </h2>
-          </div>
-          <p className="mt-1 text-xs text-tinta/70">
-            Registro auditable de todas las etapas alcanzadas, pérdidas con motivo y reaperturas.
-          </p>
+        {/* Columna derecha: Checklist de etapa + Historial cronológico completo */}
+        <div className="space-y-6 lg:col-span-5">
+          <section
+            aria-labelledby="titulo-checklist-etapa"
+            className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm"
+          >
+            <div className="flex items-center gap-2">
+              <ListChecks className="h-5 w-5 text-turquesa" aria-hidden="true" />
+              <h2 id="titulo-checklist-etapa" className="font-editorial text-lg font-bold text-tinta">
+                Lista de verificación · Etapa {ficha.etapa_orden}
+              </h2>
+            </div>
+            <p className="mt-1 text-xs text-tinta/70">
+              Guía operativa recomendada para <strong>{ficha.etapa_nombre}</strong> antes de avanzar a la siguiente etapa.
+            </p>
 
-          <ol className="relative mt-5 border-l-2 border-turquesa/35 ml-3 space-y-5">
-            {(ficha.cronologia || []).map((item) => {
-              const esPerdida = item.tipo_registro === 'perdida';
-              const esReapertura = item.tipo_registro === 'reapertura';
+            <ul className="mt-4 space-y-2.5">
+              {(CHECKLIST_POR_ETAPA[Number(ficha.etapa_orden)] || CHECKLIST_POR_ETAPA[1]).map(
+                (tarea, idx) => {
+                  const clave = `${ficha.id}-${ficha.etapa_orden}-${idx}`;
+                  const marcado = Boolean(itemsChecklistMarcados[clave]);
+                  return (
+                    <li key={clave}>
+                      <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-tinta/10 bg-marfil/60 p-3 text-xs transition hover:border-turquesa">
+                        <input
+                          type="checkbox"
+                          checked={marcado}
+                          onChange={() =>
+                            setItemsChecklistMarcados((prev) => ({
+                              ...prev,
+                              [clave]: !prev[clave]
+                            }))
+                          }
+                          className="mt-0.5 h-4 w-4 rounded border-tinta/30 accent-turquesa"
+                        />
+                        <span
+                          className={
+                            marcado ? 'line-through text-tinta/50 font-medium' : 'text-tinta font-medium'
+                          }
+                        >
+                          {tarea}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                }
+              )}
+            </ul>
+          </section>
 
-              return (
-                <li key={item.id} className="ml-5">
-                  <span
-                    className={`absolute -left-2.5 flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-white ${
-                      esPerdida
-                        ? 'bg-red-700 text-white'
-                        : esReapertura
-                        ? 'bg-coral text-white'
-                        : 'bg-turquesa text-white'
-                    }`}
-                  >
-                    <span className="h-2 w-2 rounded-full bg-white" />
-                  </span>
+          <section
+            aria-labelledby="titulo-historial-cronologico"
+            className="rounded-2xl border border-tinta/15 bg-white p-6 shadow-sm"
+          >
+            <div className="flex items-center gap-2">
+              <History className="h-5 w-5 text-turquesa" aria-hidden="true" />
+              <h2 id="titulo-historial-cronologico" className="font-editorial text-lg font-bold text-tinta">
+                Historial cronológico (UTC)
+              </h2>
+            </div>
+            <p className="mt-1 text-xs text-tinta/70">
+              Registro auditable de todas las etapas alcanzadas, pérdidas con motivo y reaperturas.
+            </p>
 
-                  <div
-                    className={`rounded-xl border p-3 ${
-                      esPerdida
-                        ? 'border-red-800/30 bg-red-50/70'
-                        : esReapertura
-                        ? 'border-coral/50 bg-coral-claro/50'
-                        : 'border-tinta/15 bg-marfil/60'
-                    }`}
-                  >
-                    <p className="text-xs font-bold text-tinta">{item.descripcion}</p>
-                    <p className="mt-1 text-[11px] font-medium text-tinta/70">
-                      Fecha registrada: {formatearFechaHoraUTC(item.fecha)}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
+            <ol className="relative mt-5 border-l-2 border-turquesa/35 ml-3 space-y-5">
+              {(ficha.cronologia || []).map((item) => {
+                const esPerdida = item.tipo_registro === 'perdida';
+                const esReapertura = item.tipo_registro === 'reapertura';
+
+                return (
+                  <li key={item.id} className="ml-5">
+                    <span
+                      className={`absolute -left-2.5 flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-white ${
+                        esPerdida
+                          ? 'bg-red-700 text-white'
+                          : esReapertura
+                          ? 'bg-coral text-white'
+                          : 'bg-turquesa text-white'
+                      }`}
+                    >
+                      <span className="h-2 w-2 rounded-full bg-white" />
+                    </span>
+
+                    <div
+                      className={`rounded-xl border p-3 ${
+                        esPerdida
+                          ? 'border-red-800/30 bg-red-50/70'
+                          : esReapertura
+                          ? 'border-coral/50 bg-coral-claro/50'
+                          : 'border-tinta/15 bg-marfil/60'
+                      }`}
+                    >
+                      <p className="text-xs font-bold text-tinta">{item.descripcion}</p>
+                      <p className="mt-1 text-[11px] font-medium text-tinta/70">
+                        Fecha registrada: {formatearFechaHoraUTC(item.fecha)}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        </div>
       </div>
     </div>
   );
