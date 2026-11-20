@@ -36,8 +36,16 @@ export async function ejecutarSemillaMySQL(customConfig = null) {
 
     for (const cliente of data.clientes) {
       await connection.execute(
-        'INSERT INTO clientes (id, nombre, es_ficticio, creado_en) VALUES (?, ?, ?, ?)',
-        [cliente.id, cliente.nombre, cliente.es_ficticio, cliente.creado_en]
+        'INSERT INTO clientes (id, nombre, telefono, correo, preferencia_contacto, es_ficticio, creado_en) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          cliente.id,
+          cliente.nombre,
+          cliente.telefono || null,
+          cliente.correo || null,
+          cliente.preferencia_contacto || 'WhatsApp',
+          cliente.es_ficticio,
+          cliente.creado_en
+        ]
       );
     }
 
@@ -79,6 +87,13 @@ export async function ejecutarSemillaMySQL(customConfig = null) {
       await connection.execute(
         'INSERT INTO eventos_comerciales (id, oportunidad_id, etapa_id, tipo, motivo_perdida_id, fecha) VALUES (?, ?, ?, ?, ?, ?)',
         [ev.id, ev.oportunidad_id, ev.etapa_id, ev.tipo, ev.motivo_perdida_id, ev.fecha]
+      );
+    }
+
+    for (const nota of data.notas_oportunidad || []) {
+      await connection.execute(
+        'INSERT INTO notas_oportunidad (id, oportunidad_id, autor, texto, fecha) VALUES (?, ?, ?, ?, ?)',
+        [nota.id, nota.oportunidad_id, nota.autor, nota.texto, nota.fecha]
       );
     }
 
