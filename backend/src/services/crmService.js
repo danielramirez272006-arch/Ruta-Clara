@@ -8,6 +8,7 @@ import {
   calcularColaSeguimientos,
   obtenerSiguienteAccionPorOrden
 } from './metricasService.js';
+import { construirSemillaReproducible } from '../../../database/seedData.js';
 
 export function fechaActualUTCMySQL() {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -714,6 +715,102 @@ export class CrmService {
         historial_etapas: historialEtapas,
         eventos_comerciales: eventosComerciales
       }
+    };
+  }
+
+  /**
+   * Restaura la semilla académica original de 40 oportunidades ([4, 4, 3, 18, 2, 2, 3, 2, 2])
+   * dentro de una transacción para dejar los valores de control listos para presentación.
+   */
+  async restaurarSemillaAcademica() {
+    const data = construirSemillaReproducible(new Date());
+
+    await withTransaction(this.pool, async (conn) => {
+      await conn.execute('DELETE FROM eventos_comerciales');
+      await conn.execute('DELETE FROM historial_etapas');
+      try {
+        await conn.execute('DELETE FROM notas_oportunidad');
+        await conn.execute('DELETE FROM campanas_guardadas');
+      } catch {
+        // Ignorar en caso de pool simulado
+      }
+      await conn.execute('DELETE FROM oportunidades');
+      await conn.execute('DELETE FROM clientes');
+
+      for (const cliente of data.clientes) {
+        await conn.execute(
+          `INSERT INTO clientes (id, nombre, telefono, correo, preferencia_contacto, es_ficticio, creado_en)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            cliente.id,
+            cliente.nombre,
+            cliente.telefono || null,
+            cliente.correo || null,
+            cliente.preferencia_contacto || 'WhatsApp',
+            cliente.es_ficticio,
+            cliente.creado_en
+          ]
+        );
+      }
+
+      for (const op of data.oportunidades) {
+        await conn.execute(
+          `INSERT INTO oportunidades (
+            id, cliente_id, sede_id, etapa_id, destino, presupuesto_total,
+            moneda, viajeros, fecha_salida, canal, estado_comercial,
+            motivo_perdida_id, creado_en, ultimo_avance_en, editado_en
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            op.id,
+            op.cliente_id,
+            op.sede_id,
+            op.etapa_id,
+            op.destino,
+            op.presupuesto_total,
+            op.moneda,
+            op.viajeros,
+            op.fecha_salida,
+            op.canal,
+            op.estado_comercial,
+            op.motivo_perdida_id,
+            op.creado_en,
+            op.ultimo_avance_en,
+            op.editado_en
+          ]
+        );
+      }
+
+      for (const hist of data.historial_etapas) {
+        await conn.execute(
+          'INSERT INTO historial_etapas (id, oportunidad_id, etapa_id, fecha) VALUES (?, ?, ?, ?)',
+          [hist.id, hist.oportunidad_id, hist.etapa_id, hist.fecha]
+        );
+      }
+
+      for (const ev of data.eventos_comerciales) {
+        await conn.execute(
+          'INSERT INTO eventos_comerciales (id, oportunidad_id, etapa_id, tipo, motivo_perdida_id, fecha) VALUES (?, ?, ?, ?, ?, ?)',
+          [ev.id, ev.oportunidad_id, ev.etapa_id, ev.tipo, ev.motivo_perdida_id, ev.fecha]
+        );
+      }
+
+      for (const nota of data.notas_oportunidad || []) {
+        try {
+          await conn.execute(
+            'INSERT INTO notas_oportunidad (id, oportunidad_id, autor, texto, fecha) VALUES (?, ?, ?, ?, ?)',
+            [nota.id, nota.oportunidad_id, nota.autor, nota.texto, nota.fecha]
+          );
+        } catch {
+          // Ignorar si no aplica
+        }
+      }
+    });
+
+    return {
+      restaurado: true,
+      clientes: data.clientes.length,
+      oportunidades: data.oportunidades.length,
+      distribucion: [4, 4, 3, 18, 2, 2, 3, 2, 2]
     };
   }
 }
