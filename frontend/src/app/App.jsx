@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Compass,
   LayoutDashboard,
@@ -10,7 +10,10 @@ import {
   Settings,
   Menu,
   X,
-  Database
+  Database,
+  Search,
+  Plane,
+  ArrowRight
 } from 'lucide-react';
 import { apiService } from '../services/api.js';
 import { InicioView } from '../features/inicio/InicioView.jsx';
@@ -21,7 +24,8 @@ import { SeguimientosView } from '../features/seguimientos/SeguimientosView.jsx'
 import { MetricasView } from '../features/metricas/MetricasView.jsx';
 import { CampanasView } from '../features/campanas/CampanasView.jsx';
 import { ConfiguracionView } from '../features/configuracion/ConfiguracionView.jsx';
-import { AlertBanner } from '../components/ui/BrandComponents.jsx';
+import { AlertBanner, EstadoComercialBadge, SedeBadge } from '../components/ui/BrandComponents.jsx';
+import { formatearPresupuesto } from '../utils/formatters.js';
 
 const ELEMENTOS_MENU = [
   { id: 'inicio', etiqueta: 'Inicio', icono: LayoutDashboard },
@@ -37,6 +41,10 @@ export function App() {
   const [pantallaActiva, setPantallaActiva] = useState('inicio');
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
 
+  // Buscador global rápido (Ctrl + K)
+  const [buscadorGlobalAbierto, setBuscadorGlobalAbierto] = useState(false);
+  const [queryGlobal, setQueryGlobal] = useState('');
+
   // Datos principales provenientes de la API Express
   const [resumen, setResumen] = useState(null);
   const [clientes, setClientes] = useState([]);
@@ -46,10 +54,12 @@ export function App() {
   const [colaAtencion, setColaAtencion] = useState(null);
   const [umbralDias, setUmbralDias] = useState(7);
   const [metricas, setMetricas] = useState(null);
+  const [campanasGuardadas, setCampanasGuardadas] = useState([]);
   const [estadoHealth, setEstadoHealth] = useState(null);
 
-  // Cliente preseleccionado cuando se pulsa "Nuevo viaje" desde la tarjeta de un cliente
+  // Preselecciones interactivas entre pantallas
   const [clientePreseleccionado, setClientePreseleccionado] = useState(null);
+  const [etapaPreseleccionadaId, setEtapaPreseleccionadaId] = useState(null);
 
   // Estados de carga y error
   const [cargandoGlobal, setCargandoGlobal] = useState(true);
@@ -61,15 +71,23 @@ export function App() {
     setCargandoGlobal(true);
     setErrorConexion(null);
     try {
-      const [resResumen, resClientes, resOportunidades, resAtencion, resEmbudo, resHealth] =
-        await Promise.all([
-          apiService.obtenerResumen(diasUmbral),
-          apiService.listarClientes(''),
-          apiService.listarOportunidades({}),
-          apiService.obtenerAtencion(diasUmbral),
-          apiService.obtenerEmbudo(),
-          apiService.obtenerHealth().catch(() => null)
-        ]);
+      const [
+        resResumen,
+        resClientes,
+        resOportunidades,
+        resAtencion,
+        resEmbudo,
+        resCampanas,
+        resHealth
+      ] = await Promise.all([
+        apiService.obtenerResumen(diasUmbral),
+        apiService.listarClientes(''),
+        apiService.listarOportunidades({}),
+        apiService.obtenerAtencion(diasUmbral),
+        apiService.obtenerEmbudo(),
+        apiService.listarCampanasGuardadas().catch(() => []),
+        apiService.obtenerHealth().catch(() => null)
+      ]);
 
       setResumen(resResumen);
       setClientes(resClientes || []);
@@ -77,6 +95,7 @@ export function App() {
       setCatalogos(resOportunidades?.catalogos || null);
       setColaAtencion(resAtencion);
       setMetricas(resEmbudo);
+      setCampanasGuardadas(resCampanas || []);
       if (resHealth) {
         setEstadoHealth(resHealth);
       }
@@ -100,6 +119,35 @@ export function App() {
     cargarTodoElEstado(7);
   }, [cargarTodoElEstado]);
 
+  // Atajo de teclado Ctrl + K o Cmd + K para abrir el buscador global
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setBuscadorGlobalAbierto((prev) => !prev);
+      } else if (e.key === 'Escape' && buscadorGlobalAbierto) {
+        setBuscadorGlobalAbierto(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [buscadorGlobalAbierto]);
+
+  const resultadosBusquedaGlobal = useMemo(() => {
+    const q = queryGlobal.trim().toLowerCase();
+    if (!q) return (oportunidades || []).slice(0, 6);
+    return (oportunidades || [])
+      .filter(
+        (op) =>
+          String(op.id) === q ||
+          String(op.cliente_nombre || '').toLowerCase().includes(q) ||
+          String(op.destino || '').toLowerCase().includes(q) ||
+          String(op.etapa_nombre || '').toLowerCase().includes(q) ||
+          String(op.sede_nombre || '').toLowerCase().includes(q)
+      )
+      .slice(0, 8);
+  }, [oportunidades, queryGlobal]);
+
   const navegarAPantalla = (idPantalla) => {
     setPantallaActiva(idPantalla);
     setMenuMovilAbierto(false);
@@ -109,6 +157,7 @@ export function App() {
   };
 
   const abrirFichaOportunidad = async (oportunidadId) => {
+    setBuscadorGlobalAbierto(false);
     setPantallaActiva('ficha');
     setMenuMovilAbierto(false);
     setCargandoFicha(true);
@@ -120,6 +169,11 @@ export function App() {
     } finally {
       setCargandoFicha(false);
     }
+  };
+
+  const filtrarOportunidadesPorEtapa = (etapaId) => {
+    setEtapaPreseleccionadaId(etapaId);
+    setPantallaActiva('oportunidades');
   };
 
   // Handlers de Clientes
@@ -161,7 +215,9 @@ export function App() {
 
   const handleAvanzarEtapa = async (id, etapaDestinoId) => {
     const actualizada = await apiService.avanzarEtapaOportunidad(id, etapaDestinoId);
-    setFichaActiva(actualizada);
+    if (fichaActiva && Number(fichaActiva.id) === Number(id)) {
+      setFichaActiva(actualizada);
+    }
     await cargarTodoElEstado(umbralDias);
     return actualizada;
   };
@@ -173,8 +229,14 @@ export function App() {
     return actualizada;
   };
 
-  const handleGenerarMensajeIA = async (id) => {
-    return apiService.generarMensajeIA(id);
+  const handleGenerarMensajeIA = async (id, tono = 'cálido y consultivo') => {
+    return apiService.generarMensajeIA(id, tono);
+  };
+
+  const handleAgregarNota = async (id, payload) => {
+    const actualizada = await apiService.agregarNotaOportunidad(id, payload);
+    setFichaActiva(actualizada);
+    return actualizada;
   };
 
   // Handlers de Seguimientos
@@ -186,7 +248,16 @@ export function App() {
 
   // Handlers de Campañas y Configuración
   const handleGenerarCampana = async (payload) => {
-    return apiService.generarCampanaIA(payload);
+    const creada = await apiService.generarCampanaIA(payload);
+    const lista = await apiService.listarCampanasGuardadas().catch(() => []);
+    setCampanasGuardadas(lista || []);
+    return creada;
+  };
+
+  const handleAprobarCampana = async (campanaId) => {
+    const lista = await apiService.aprobarCampanaIA(campanaId);
+    setCampanasGuardadas(lista || []);
+    return lista;
   };
 
   const handleVerificarHealth = async () => {
@@ -198,7 +269,7 @@ export function App() {
       setEstadoHealth({
         ok: false,
         mysql: { conectado: false, mensaje: err.message },
-        claude: { configurado: false, mensaje: 'Servidor Express no alcanzable.' }
+        ia: { configurado: false, mensaje: 'Servidor Express no alcanzable.' }
       });
     } finally {
       setCargandoHealth(false);
@@ -211,13 +282,83 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-marfil text-tinta flex flex-col lg:flex-row">
-      {/* Enlace de salto accesible para navegación por teclado */}
       <a
         href="#contenido-principal"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-tinta focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white"
       >
         Saltar al contenido principal
       </a>
+
+      {/* Modal de Búsqueda Global Rápida (Ctrl + K) */}
+      {buscadorGlobalAbierto ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Buscador rápido de oportunidades y clientes"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-tinta/60 p-4 pt-16 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-2xl rounded-2xl border border-tinta/20 bg-white p-5 shadow-2xl">
+            <div className="flex items-center justify-between gap-2 border-b border-tinta/10 pb-3">
+              <div className="flex flex-1 items-center gap-2.5">
+                <Search className="h-5 w-5 text-turquesa" aria-hidden="true" />
+                <input
+                  type="search"
+                  autoFocus
+                  value={queryGlobal}
+                  onChange={(e) => setQueryGlobal(e.target.value)}
+                  placeholder="Buscar por ID, viajero, destino (Cancún, Oaxaca, Madrid, Bogotá) o etapa..."
+                  className="w-full bg-transparent text-sm font-medium text-tinta placeholder:text-tinta/45 focus:outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setBuscadorGlobalAbierto(false)}
+                className="rounded-lg border border-tinta/15 bg-marfil px-2.5 py-1 text-xs font-semibold text-tinta"
+              >
+                ESC
+              </button>
+            </div>
+
+            <div className="mt-3 max-h-80 overflow-y-auto divide-y divide-tinta/10">
+              {resultadosBusquedaGlobal.length === 0 ? (
+                <p className="py-6 text-center text-xs text-tinta/65">
+                  No se encontraron oportunidades con &ldquo;{queryGlobal}&rdquo;.
+                </p>
+              ) : (
+                resultadosBusquedaGlobal.map((op) => (
+                  <button
+                    key={op.id}
+                    type="button"
+                    onClick={() => abrirFichaOportunidad(op.id)}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-marfil"
+                  >
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-tinta">
+                          <Plane className="h-3.5 w-3.5 text-turquesa" aria-hidden="true" />
+                          <span>
+                            #{op.id} · {op.destino} — {op.cliente_nombre}
+                          </span>
+                        </span>
+                        <SedeBadge nombre={op.sede_nombre} />
+                        <EstadoComercialBadge
+                          estado={op.estado_comercial}
+                          motivo={op.motivo_perdida_nombre}
+                        />
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-tinta/70">
+                        Etapa {op.etapa_orden}: {op.etapa_nombre} ·{' '}
+                        {formatearPresupuesto(op.presupuesto_total, op.moneda)}
+                      </p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-turquesa" aria-hidden="true" />
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Barra superior para móvil y tableta */}
       <div className="flex items-center justify-between border-b border-white/10 bg-tinta px-4 py-3.5 text-white lg:hidden">
@@ -231,20 +372,30 @@ export function App() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setMenuMovilAbierto((prev) => !prev)}
-          aria-expanded={menuMovilAbierto}
-          aria-controls="menu-navegacion-lateral"
-          aria-label={menuMovilAbierto ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'}
-          className="rounded-xl border border-white/15 p-2 text-marfil hover:bg-tinta-suave"
-        >
-          {menuMovilAbierto ? (
-            <X className="h-5 w-5" aria-hidden="true" />
-          ) : (
-            <Menu className="h-5 w-5" aria-hidden="true" />
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setBuscadorGlobalAbierto(true)}
+            className="rounded-xl border border-white/15 p-2 text-marfil hover:bg-tinta-suave"
+            aria-label="Abrir buscador rápido"
+          >
+            <Search className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMenuMovilAbierto((prev) => !prev)}
+            aria-expanded={menuMovilAbierto}
+            aria-controls="menu-navegacion-lateral"
+            aria-label={menuMovilAbierto ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'}
+            className="rounded-xl border border-white/15 p-2 text-marfil hover:bg-tinta-suave"
+          >
+            {menuMovilAbierto ? (
+              <X className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Menú lateral azul tinta (#152D39) */}
@@ -256,7 +407,6 @@ export function App() {
         } w-full shrink-0 bg-tinta text-marfil lg:flex lg:w-72 lg:flex-col lg:justify-between`}
       >
         <div className="p-6">
-          {/* Identidad de marca en escritorio */}
           <div className="hidden lg:block">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-turquesa text-white shadow-sm">
@@ -270,7 +420,6 @@ export function App() {
               </div>
             </div>
 
-            {/* Línea de recorrido con puntos en el menú lateral */}
             <div className="mt-4 flex items-center gap-1.5" aria-hidden="true">
               <span className="h-2 w-2 rounded-full bg-turquesa" />
               <span className="h-0.5 flex-1 bg-white/20" />
@@ -278,10 +427,24 @@ export function App() {
               <span className="h-0.5 flex-1 bg-white/20" />
               <span className="h-2 w-2 rounded-full bg-turquesa" />
             </div>
+
+            {/* Botón de buscador rápido Ctrl + K en el menú lateral */}
+            <button
+              type="button"
+              onClick={() => setBuscadorGlobalAbierto(true)}
+              className="mt-4 flex w-full items-center justify-between rounded-xl border border-white/15 bg-tinta-suave/70 px-3 py-2 text-xs text-marfil/80 transition hover:border-turquesa hover:text-white"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Search className="h-3.5 w-3.5 text-coral" aria-hidden="true" />
+                <span>Buscar viaje o cliente...</span>
+              </span>
+              <kbd className="rounded bg-tinta px-1.5 py-0.5 font-mono text-[10px] text-marfil/75">
+                Ctrl+K
+              </kbd>
+            </button>
           </div>
 
-          {/* Vínculos de las 7 pantallas */}
-          <nav className="mt-2 lg:mt-6 space-y-1.5" aria-label="Secciones del CRM">
+          <nav className="mt-2 lg:mt-5 space-y-1.5" aria-label="Secciones del CRM">
             {ELEMENTOS_MENU.map((item) => {
               const Icono = item.icono;
               const activo =
@@ -319,7 +482,6 @@ export function App() {
           </nav>
         </div>
 
-        {/* Pie del menú lateral con estado de conexión */}
         <div className="border-t border-white/10 p-5 text-xs text-marfil/75">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5 font-semibold text-white">
@@ -347,7 +509,6 @@ export function App() {
         </div>
       </aside>
 
-      {/* Área de trabajo principal en fondo marfil (#F7F5EF) */}
       <main id="contenido-principal" className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-7xl space-y-6">
           {errorConexion ? (
@@ -385,6 +546,7 @@ export function App() {
               onRecargar={() => cargarTodoElEstado(umbralDias)}
               onAbrirOportunidad={abrirFichaOportunidad}
               onIrAPantalla={navegarAPantalla}
+              onFiltrarOportunidadesPorEtapa={filtrarOportunidadesPorEtapa}
             />
           ) : null}
 
@@ -407,8 +569,11 @@ export function App() {
               clientes={clientes}
               cargando={cargandoGlobal}
               clientePreseleccionado={clientePreseleccionado}
+              etapaPreseleccionadaId={etapaPreseleccionadaId}
               onLimpiarPreseleccionCliente={() => setClientePreseleccionado(null)}
+              onLimpiarPreseleccionEtapa={() => setEtapaPreseleccionadaId(null)}
               onCrearOportunidad={handleCrearOportunidad}
+              onAvanzarEtapa={handleAvanzarEtapa}
               onAbrirOportunidad={abrirFichaOportunidad}
             />
           ) : null}
@@ -423,6 +588,7 @@ export function App() {
               onAvanzarEtapa={handleAvanzarEtapa}
               onCambiarEstadoComercial={handleCambiarEstadoComercial}
               onGenerarMensajeIA={handleGenerarMensajeIA}
+              onAgregarNota={handleAgregarNota}
             />
           ) : null}
 
@@ -443,13 +609,16 @@ export function App() {
               cargando={cargandoGlobal}
               error={errorConexion}
               onRecargar={() => cargarTodoElEstado(umbralDias)}
+              onFiltrarOportunidadesPorEtapa={filtrarOportunidadesPorEtapa}
             />
           ) : null}
 
           {pantallaActiva === 'campanas' ? (
             <CampanasView
               catalogos={catalogos}
+              campanasGuardadas={campanasGuardadas}
               onGenerarCampana={handleGenerarCampana}
+              onAprobarCampana={handleAprobarCampana}
             />
           ) : null}
 
