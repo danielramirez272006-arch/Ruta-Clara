@@ -68,6 +68,20 @@ export function validarClientePayload(body, parcial = false) {
     resultado.nombre = body.nombre.trim();
   }
 
+  if (body.telefono !== undefined) {
+    resultado.telefono = body.telefono ? String(body.telefono).trim().slice(0, 40) : null;
+  }
+
+  if (body.correo !== undefined) {
+    resultado.correo = body.correo ? String(body.correo).trim().slice(0, 140) : null;
+  }
+
+  if (body.preferencia_contacto !== undefined) {
+    resultado.preferencia_contacto = String(body.preferencia_contacto || 'WhatsApp').trim().slice(0, 40);
+  } else if (!parcial) {
+    resultado.preferencia_contacto = 'WhatsApp';
+  }
+
   if (body.es_ficticio !== undefined) {
     resultado.es_ficticio = body.es_ficticio ? 1 : 0;
   } else if (!parcial) {
@@ -79,6 +93,28 @@ export function validarClientePayload(body, parcial = false) {
   }
 
   return resultado;
+}
+
+export function validarNotaOportunidadPayload(body) {
+  if (!body || typeof body !== 'object') {
+    throw new AppError('El cuerpo de la solicitud es obligatorio.', 400, 'VALIDACION_BODY_VACIO');
+  }
+
+  const texto = typeof body.texto === 'string' ? body.texto.trim() : '';
+  if (texto.length < 2 || texto.length > 600) {
+    throw new AppError(
+      'La nota del agente debe tener entre 2 y 600 caracteres.',
+      400,
+      'VALIDACION_NOTA_TEXTO'
+    );
+  }
+
+  const autor =
+    typeof body.autor === 'string' && body.autor.trim().length > 0
+      ? body.autor.trim().slice(0, 80)
+      : 'Asesor Ruta Clara';
+
+  return { texto, autor };
 }
 
 export function validarPreferenciasViaje(body, parcial = false) {
