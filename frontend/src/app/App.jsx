@@ -280,6 +280,12 @@ export function App() {
     return apiService.exportarDatosJSON();
   };
 
+  const handleRestaurarSemilla = async () => {
+    const res = await apiService.restaurarSemillaAcademica();
+    await cargarTodoElEstado(umbralDias);
+    return res;
+  };
+
   return (
     <div className="min-h-screen bg-marfil text-tinta flex flex-col lg:flex-row">
       <a
@@ -628,6 +634,7 @@ export function App() {
               cargandoHealth={cargandoHealth}
               onVerificarHealth={handleVerificarHealth}
               onExportarJSON={handleExportarJSON}
+              onRestaurarSemilla={handleRestaurarSemilla}
             />
           ) : null}
         </div>
